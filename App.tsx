@@ -23,10 +23,15 @@ import {
   Calendar,
   Flame,
   LogOut,
-  User
+  User,
+  ArrowLeftRight
 } from "lucide-react";
 
-export default function App() {
+interface AppProps {
+  onSwitchApp?: () => void;
+}
+
+export default function App({ onSwitchApp }: AppProps) {
   const [activeTab, setActiveTab] = useState<"landing" | "onboarding" | "dashboard" | "today" | "plan" | "profile" | "calendar">("landing");
 
   const [onboarding, setOnboarding] = useState<OnboardingData | null>(null);
@@ -187,7 +192,16 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {onSwitchApp && (
+              <button
+                onClick={onSwitchApp}
+                title="Cambiar de app"
+                className="flex p-2.5 rounded-2xl bg-zinc-100 border border-zinc-200 text-zinc-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition cursor-pointer shadow-xs"
+              >
+                <ArrowLeftRight className="w-4 h-4" />
+              </button>
+            )}
             {plan && (
               <button
                 onClick={handleResetAll}

@@ -1,0 +1,195 @@
+import React from "react";
+import { HyroxTrainingPlan, HyroxObjective } from "../../hyroxTypes";
+import { STATION_LABELS } from "../../hyroxLibrary";
+import { Activity, TrendingUp, Award, ShieldAlert, Zap, Calendar, Layers, Target, Flag } from "lucide-react";
+
+interface HyroxDashboardProps {
+  plan: HyroxTrainingPlan;
+  activeInjury: boolean;
+  injuryAreas: string[];
+}
+
+export default function HyroxDashboard({ plan, activeInjury, injuryAreas }: HyroxDashboardProps) {
+  const { initialDiagnostic } = plan;
+
+  const renderBMIWidget = (bmi: number, category: string) => {
+    const pct = Math.max(0, Math.min(100, ((bmi - 15) / (35 - 15)) * 100));
+    let barColor = "bg-blue-600";
+    if (category === "Sobrepeso") barColor = "bg-amber-500";
+    if (category === "Obesidad" || category === "Bajo peso") barColor = "bg-rose-500";
+
+    return (
+      <div className="bg-white rounded-2xl p-6 border border-zinc-200/80 shadow-sm">
+        <div className="flex items-center gap-2 mb-4">
+          <Activity className="w-4 h-4 text-blue-600" />
+          <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-900">Composición Corporal (IMC)</h4>
+        </div>
+        <div className="flex items-end justify-between mb-4">
+          <div className="text-4xl font-black text-zinc-900">{bmi}</div>
+          <div className="px-3 py-1 rounded-full bg-zinc-100 border border-zinc-200 text-xs font-bold uppercase tracking-wider text-zinc-700">
+            {category}
+          </div>
+        </div>
+        <div className="relative h-2.5 bg-zinc-100 rounded-full overflow-hidden">
+          <div className={`absolute left-0 top-0 h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+        </div>
+        <div className="grid grid-cols-4 gap-2 mt-3 text-[9px] text-zinc-400 font-bold uppercase tracking-wider">
+          <span>Delgado</span>
+          <span>Normal</span>
+          <span>Sobrepeso</span>
+          <span>Obeso</span>
+        </div>
+      </div>
+    );
+  };
+
+  const getObjectiveFriendlyName = (obj: HyroxObjective) => {
+    switch (obj) {
+      case HyroxObjective.PRIMERA_CARRERA:
+        return "Mi Primera Carrera Hyrox";
+      case HyroxObjective.MEJORAR_TIEMPO:
+        return "Mejorar Mi Tiempo Hyrox";
+      case HyroxObjective.BASE_GENERAL:
+        return "Base de Fuerza y Acondicionamiento";
+      default:
+        return "Plan Hyrox Adaptativo";
+    }
+  };
+
+  const daysToRace = plan.raceDate
+    ? Math.max(0, Math.ceil((new Date(plan.raceDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : null;
+
+  return (
+    <div className="space-y-6">
+      {/* Hero Header Card */}
+      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-zinc-200/80 shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div>
+            <div className="flex items-center gap-2 text-blue-600 text-xs font-bold uppercase tracking-wider mb-2">
+              <Zap className="w-4 h-4" />
+              Plan Generado por Master Brain Hyrox
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-black italic uppercase tracking-tight text-zinc-900">
+              {getObjectiveFriendlyName(plan.objective)}
+            </h3>
+            <p className="text-xs text-zinc-500 font-medium max-w-2xl mt-2 leading-relaxed">
+              Este panel reúne tu diagnóstico inicial, tu tiempo objetivo de carrera y las estaciones que priorizaremos en tu plan.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 min-w-[220px]">
+            <div className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-4 text-center">
+              <Calendar className="w-4 h-4 text-blue-600 mx-auto mb-1.5" />
+              <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Duración</p>
+              <p className="text-base font-black text-zinc-900">{plan.durationWeeks} Semanas</p>
+            </div>
+            <div className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-4 text-center">
+              <Layers className="w-4 h-4 text-blue-600 mx-auto mb-1.5" />
+              <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Frecuencia</p>
+              <p className="text-base font-black text-zinc-900">{plan.frequency}x / semana</p>
+            </div>
+          </div>
+        </div>
+
+        {daysToRace !== null && (
+          <div className="mt-5 pt-5 border-t border-zinc-100 flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-blue-600 text-white">
+              <Flag className="w-4 h-4" />
+            </div>
+            <p className="text-xs text-zinc-700 font-medium">
+              Quedan <span className="font-black text-blue-600">{daysToRace} días</span> para tu carrera Hyrox.
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="bg-white rounded-2xl p-6 border border-zinc-200/80 shadow-sm lg:col-span-1">
+          <div className="flex items-center gap-2 mb-5">
+            <Award className="w-4 h-4 text-blue-600" />
+            <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-900">Diagnóstico del Atleta</h4>
+          </div>
+
+          <div className="space-y-4">
+            <div className="bg-zinc-50 border border-zinc-200/80 rounded-xl p-4">
+              <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mb-1">Nivel Estimado</p>
+              <p className="text-xl font-black text-zinc-900">{initialDiagnostic.levelEstimated}</p>
+            </div>
+
+            <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-4">
+              <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wider mb-1">Limitante Principal</p>
+              <p className="text-sm font-black text-zinc-900 leading-snug">{initialDiagnostic.mainLimitant}</p>
+              <p className="text-xs text-zinc-500 font-medium mt-2 leading-relaxed">
+                El plan priorizará esta debilidad para evitar estancamientos el día de la carrera.
+              </p>
+            </div>
+
+            {activeInjury && (
+              <div className="bg-rose-50 border border-rose-200 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <ShieldAlert className="w-4 h-4 text-rose-600" />
+                  <p className="text-[10px] text-rose-600 font-bold uppercase tracking-wider">Molestia Activa</p>
+                </div>
+                <p className="text-xs text-zinc-800 font-bold">Zonas: {injuryAreas.join(", ")}</p>
+                <p className="text-xs text-zinc-500 font-medium mt-1 leading-relaxed">
+                  El motor bloqueará estaciones de riesgo en estas zonas si reportas dolor agudo hoy.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-5 lg:col-span-2">
+          <div>{renderBMIWidget(initialDiagnostic.bmi, initialDiagnostic.bmiCategory)}</div>
+
+          <div className="bg-white rounded-2xl p-6 border border-zinc-200/80 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp className="w-4 h-4 text-blue-600" />
+              <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-900">Tiempo Objetivo de Carrera</h4>
+            </div>
+
+            <p className="text-xs text-zinc-500 font-medium leading-relaxed mb-5">
+              Estimación calculada en base a tu nivel, división y estaciones débiles reportadas.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Conservador</p>
+                <p className="text-xl sm:text-2xl font-black text-zinc-900 font-mono mt-1">{initialDiagnostic.estimatedFinishTime.conservador}</p>
+              </div>
+              <div className="bg-blue-50/60 border border-blue-200 rounded-2xl p-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-blue-600">Realista</p>
+                <p className="text-xl sm:text-2xl font-black text-blue-700 font-mono mt-1">{initialDiagnostic.estimatedFinishTime.realista}</p>
+              </div>
+              {initialDiagnostic.estimatedFinishTime.agresivo && (
+                <div className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Agresivo</p>
+                  <p className="text-xl sm:text-2xl font-black text-zinc-900 font-mono mt-1">{initialDiagnostic.estimatedFinishTime.agresivo}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-5 bg-zinc-50 border border-zinc-200/80 rounded-2xl p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Target className="w-4 h-4 text-blue-600" />
+                <p className="text-xs font-bold uppercase tracking-wider text-zinc-900">Estaciones a Priorizar</p>
+              </div>
+              {initialDiagnostic.weakStations.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {initialDiagnostic.weakStations.map(s => (
+                    <span key={s} className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 text-xs font-bold border border-rose-200">
+                      {STATION_LABELS[s]}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-zinc-500 font-medium">No reportaste estaciones débiles. El plan mantendrá un enfoque equilibrado.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
