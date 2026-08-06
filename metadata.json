@@ -1,0 +1,8 @@
+{
+  "name": "Remix ELEVR MVP FULL PWA + entreno story",
+  "description": "MVP de un generador de planes de entrenamiento de running personalizados con motores de decisión adaptativa y cálculo de Readiness.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
