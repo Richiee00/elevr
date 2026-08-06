@@ -1,6 +1,6 @@
 import React from "react";
-import { HyroxTrainingPlan, HyroxObjective } from "../../hyroxTypes";
-import { STATION_LABELS } from "../../hyroxLibrary";
+import { HyroxTrainingPlan, HyroxObjective } from "./hyroxTypes";
+import { STATION_LABELS } from "./hyroxLibrary";
 import { Activity, TrendingUp, Award, ShieldAlert, Zap, Calendar, Layers, Target, Flag } from "lucide-react";
 
 interface HyroxDashboardProps {

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { motion } from "motion/react";
-import { OnboardingData, RunningObjective, TrainingPlan } from "../types";
+import { OnboardingData, RunningObjective, TrainingPlan } from "./types";
 import {
   User,
   Scale,
@@ -16,7 +16,7 @@ import {
   Flame,
   Dumbbell
 } from "lucide-react";
-import { calculateBMI } from "../engines";
+import { calculateBMI } from "./engines";
 
 interface ProfileViewProps {
   onboarding: OnboardingData;

@@ -8,13 +8,13 @@ import {
 import { generateTrainingPlan } from "./engines";
 
 // View components
-import Landing from "./components/Landing";
-import Onboarding from "./components/Onboarding";
-import Dashboard from "./components/Dashboard";
-import WeeklyPlanView from "./components/WeeklyPlanView";
-import TodayWorkoutView from "./components/TodayWorkoutView";
-import ProfileView from "./components/ProfileView";
-import CalendarView from "./components/CalendarView";
+import Landing from "./Landing";
+import Onboarding from "./Onboarding";
+import Dashboard from "./Dashboard";
+import WeeklyPlanView from "./WeeklyPlanView";
+import TodayWorkoutView from "./TodayWorkoutView";
+import ProfileView from "./ProfileView";
+import CalendarView from "./CalendarView";
 
 // Icons
 import {

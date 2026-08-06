@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { motion } from "motion/react";
-import { HyroxTrainingPlan, HyroxCategory, HyroxWorkoutSession } from "../../hyroxTypes";
-import { DailyReadinessInput } from "../../types";
-import { getTemplateById, CATEGORY_LABELS } from "../../hyroxLibrary";
-import { adaptHyroxSession } from "../../hyroxEngine";
+import { HyroxTrainingPlan, HyroxCategory, HyroxWorkoutSession } from "./hyroxTypes";
+import { DailyReadinessInput } from "./types";
+import { getTemplateById, CATEGORY_LABELS } from "./hyroxLibrary";
+import { adaptHyroxSession } from "./hyroxEngine";
 import HyroxWorkoutCard from "./HyroxWorkoutCard";
 import HyroxWorkoutDetail from "./HyroxWorkoutDetail";
 import HyroxReadinessCard from "./HyroxReadinessCard";

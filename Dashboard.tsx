@@ -1,5 +1,5 @@
 import React from "react";
-import { TrainingPlan, RunningObjective } from "../types";
+import { TrainingPlan, RunningObjective } from "./types";
 import {
   Activity,
   TrendingUp,

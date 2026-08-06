@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
-import { HyroxTrainingPlan, HyroxCategory } from "../../hyroxTypes";
-import { getTemplateById, CATEGORY_LABELS } from "../../hyroxLibrary";
+import { HyroxTrainingPlan, HyroxCategory } from "./hyroxTypes";
+import { getTemplateById, CATEGORY_LABELS } from "./hyroxLibrary";
 import { ChevronLeft, ChevronRight, CalendarCheck2, CheckCircle2 } from "lucide-react";
 
 interface HyroxCalendarViewProps {

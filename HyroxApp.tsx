@@ -4,13 +4,13 @@ import { HyroxOnboardingData, HyroxTrainingPlan } from "./hyroxTypes";
 import { DailyReadinessInput } from "./types";
 import { generateHyroxPlan } from "./hyroxEngine";
 
-import HyroxLanding from "./components/hyrox/HyroxLanding";
-import HyroxOnboarding from "./components/hyrox/HyroxOnboarding";
-import HyroxDashboard from "./components/hyrox/HyroxDashboard";
-import HyroxWeeklyPlanView from "./components/hyrox/HyroxWeeklyPlanView";
-import HyroxTodayWorkoutView from "./components/hyrox/HyroxTodayWorkoutView";
-import HyroxProfileView from "./components/hyrox/HyroxProfileView";
-import HyroxCalendarView from "./components/hyrox/HyroxCalendarView";
+import HyroxLanding from "./HyroxLanding";
+import HyroxOnboarding from "./HyroxOnboarding";
+import HyroxDashboard from "./HyroxDashboard";
+import HyroxWeeklyPlanView from "./HyroxWeeklyPlanView";
+import HyroxTodayWorkoutView from "./HyroxTodayWorkoutView";
+import HyroxProfileView from "./HyroxProfileView";
+import HyroxCalendarView from "./HyroxCalendarView";
 
 import { LayoutDashboard, CalendarDays, Calendar, Flame, LogOut, User, ArrowLeftRight } from "lucide-react";
 

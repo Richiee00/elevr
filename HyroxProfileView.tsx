@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from "react";
 import { motion } from "motion/react";
-import { HyroxOnboardingData, HyroxObjective, HyroxTrainingPlan } from "../../hyroxTypes";
-import { STATION_LABELS } from "../../hyroxLibrary";
-import { calculateBMI } from "../../hyroxEngine";
+import { HyroxOnboardingData, HyroxObjective, HyroxTrainingPlan } from "./hyroxTypes";
+import { STATION_LABELS } from "./hyroxLibrary";
+import { calculateBMI } from "./hyroxEngine";
 import { User, Activity, Check, Calendar, TrendingUp, Flag, Dumbbell } from "lucide-react";
 
 interface HyroxProfileViewProps {

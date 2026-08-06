@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { DailyReadinessInput } from "../../types";
+import { DailyReadinessInput } from "./types";
 import { BrainCircuit, Check } from "lucide-react";
 
 function getSleepQualityColor(q: "bueno" | "normal" | "malo", isSelected: boolean): string {

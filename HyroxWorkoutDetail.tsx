@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { HyroxBlock, HyroxExercise, HyroxWorkoutTemplate } from "../../hyroxTypes";
-import { STATION_LABELS, CATEGORY_LABELS } from "../../hyroxLibrary";
-import { blockFormatLabel, parseDurationToSeconds } from "../../hyroxEngine";
+import { HyroxBlock, HyroxExercise, HyroxWorkoutTemplate } from "./hyroxTypes";
+import { STATION_LABELS, CATEGORY_LABELS } from "./hyroxLibrary";
+import { blockFormatLabel, parseDurationToSeconds } from "./hyroxEngine";
 import {
   Clock,
   Dumbbell,

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { TrainingPlan, WorkoutSession } from "../types";
+import { TrainingPlan, WorkoutSession } from "./types";
 import {
   ChevronLeft,
   ChevronRight,

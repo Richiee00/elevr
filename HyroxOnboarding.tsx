@@ -7,8 +7,8 @@ import {
   HyroxFrequencyOption,
   HyroxOnboardingData,
   HyroxStation
-} from "../../hyroxTypes";
-import { STATION_LABELS, HYROX_STATIONS_ORDER } from "../../hyroxLibrary";
+} from "./hyroxTypes";
+import { STATION_LABELS, HYROX_STATIONS_ORDER } from "./hyroxLibrary";
 import {
   ArrowLeft,
   ArrowRight,

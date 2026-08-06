@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { TrainingPlan, WorkoutSession, WeeklyPlan, DailyReadinessInput, DailyReadinessScore } from "../types";
-import { calculateReadiness, runDailyExecutionEngine } from "../engines";
+import { TrainingPlan, WorkoutSession, WeeklyPlan, DailyReadinessInput, DailyReadinessScore } from "./types";
+import { calculateReadiness, runDailyExecutionEngine } from "./engines";
 import { 
   Calendar, 
   Dumbbell, 

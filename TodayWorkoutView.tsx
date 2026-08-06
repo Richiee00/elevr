@@ -5,11 +5,11 @@ import {
   DailyReadinessInput, 
   WorkoutSession, 
   DailyReadinessScore 
-} from "../types";
+} from "./types";
 import { 
   runDailyExecutionEngine, 
   calculateReadiness 
-} from "../engines";
+} from "./engines";
 import { 
   Activity, 
   BrainCircuit, 

@@ -1,6 +1,6 @@
 import React from "react";
-import { HyroxWorkoutTemplate } from "../../hyroxTypes";
-import { STATION_LABELS, CATEGORY_LABELS } from "../../hyroxLibrary";
+import { HyroxWorkoutTemplate } from "./hyroxTypes";
+import { STATION_LABELS, CATEGORY_LABELS } from "./hyroxLibrary";
 import { Clock, Dumbbell, CheckCircle, ChevronRight } from "lucide-react";
 
 interface HyroxWorkoutCardProps {

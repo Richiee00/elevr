@@ -5,7 +5,7 @@ import {
   ExperienceLevel,
   FrequencyOption,
   OnboardingData
-} from "../types";
+} from "./types";
 import {
   ArrowLeft,
   ArrowRight,
