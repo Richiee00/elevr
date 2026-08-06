@@ -1,0 +1,50 @@
+{
+  "name": "ELEVR MVP FULL PWA",
+  "short_name": "ELEVR",
+  "description": "MVP de un generador de planes de entrenamiento de running personalizados con motores de decisión adaptativa y cálculo de Readiness.",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "window-controls-overlay"],
+  "orientation": "portrait-primary",
+  "background_color": "#0A0A0A",
+  "theme_color": "#00F6A9",
+  "categories": ["sports", "health", "fitness"],
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
