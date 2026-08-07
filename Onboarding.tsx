@@ -22,21 +22,26 @@ import {
 interface OnboardingProps {
   onComplete: (data: OnboardingData) => void;
   onCancel: () => void;
+  baseProfile?: { age: number; sex: "M" | "F"; height: number; weight: number };
+  stepOffset?: number;
 }
 
-export default function Onboarding({ onComplete, onCancel }: OnboardingProps) {
-  const [step, setStep] = useState<number>(1);
+export default function Onboarding({ onComplete, onCancel, baseProfile, stepOffset = 0 }: OnboardingProps) {
+  const firstStep = baseProfile ? 2 : 1;
+  const [step, setStep] = useState<number>(firstStep);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
   }, [step]);
 
+  const stepLabel = (n: number) => n + stepOffset;
+
   // State for onboarding data
   // Importante: estos campos son string para evitar bugs tipo 032, 0175 o volver a 0 al borrar.
-  const [age, setAge] = useState<string>("30");
-  const [sex, setSex] = useState<"M" | "F">("M");
-  const [height, setHeight] = useState<string>("175");
-  const [weight, setWeight] = useState<string>("70");
+  const [age, setAge] = useState<string>(baseProfile ? String(baseProfile.age) : "30");
+  const [sex, setSex] = useState<"M" | "F">(baseProfile?.sex ?? "M");
+  const [height, setHeight] = useState<string>(baseProfile ? String(baseProfile.height) : "175");
+  const [weight, setWeight] = useState<string>(baseProfile ? String(baseProfile.weight) : "70");
 
   const [objective, setObjective] = useState<RunningObjective>(RunningObjective.PRIMER_10K);
 
@@ -114,7 +119,7 @@ export default function Onboarding({ onComplete, onCancel }: OnboardingProps) {
   };
 
   const handleBack = () => {
-    if (step > 1) {
+    if (step > firstStep) {
       setStep(prev => prev - 1);
     } else {
       onCancel();
@@ -171,7 +176,7 @@ export default function Onboarding({ onComplete, onCancel }: OnboardingProps) {
             <div>
               <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
                 <User className="w-5 h-5 text-blue-600" />
-                1. PERFIL FISIOLÓGICO
+                {stepLabel(1)}. PERFIL FISIOLÓGICO
               </h3>
               <div className="space-y-1">
                 <p className="text-xs font-bold text-blue-600 uppercase tracking-wider">
@@ -264,7 +269,7 @@ export default function Onboarding({ onComplete, onCancel }: OnboardingProps) {
             <div>
               <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
                 <Target className="w-5 h-5 text-blue-600" />
-                2. OBJETIVO PRINCIPAL
+                {stepLabel(2)}. OBJETIVO PRINCIPAL
               </h3>
               <p className="text-xs uppercase tracking-wider text-zinc-500 font-bold">
                 Selecciona la meta de entrenamiento que deseas abordar hoy. Esto determinará la lógica y estructura de tu plan completo.
@@ -329,7 +334,7 @@ export default function Onboarding({ onComplete, onCancel }: OnboardingProps) {
             <div>
               <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
                 <Settings className="w-5 h-5 text-blue-600" />
-                3. DATOS DE RENDIMIENTO
+                {stepLabel(3)}. DATOS DE RENDIMIENTO
               </h3>
               <p className="text-xs uppercase tracking-wider text-zinc-500 font-bold">
                 Ajustemos las métricas específicas para tu objetivo:{" "}
@@ -490,7 +495,7 @@ export default function Onboarding({ onComplete, onCancel }: OnboardingProps) {
             <div>
               <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
                 <ShieldAlert className="w-5 h-5 text-blue-600" />
-                4. DISPONIBILIDAD Y LESIONES
+                {stepLabel(4)}. DISPONIBILIDAD Y LESIONES
               </h3>
               <p className="text-xs uppercase tracking-wider text-zinc-500 font-bold">
                 Ajustemos la frecuencia semanal de running e historial de molestias para evitar lesiones en tu plan.

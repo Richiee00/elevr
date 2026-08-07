@@ -23,19 +23,24 @@ import {
 interface HyroxOnboardingProps {
   onComplete: (data: HyroxOnboardingData) => void;
   onCancel: () => void;
+  baseProfile?: { age: number; sex: "M" | "F"; height: number; weight: number };
+  stepOffset?: number;
 }
 
-export default function HyroxOnboarding({ onComplete, onCancel }: HyroxOnboardingProps) {
-  const [step, setStep] = useState<number>(1);
+export default function HyroxOnboarding({ onComplete, onCancel, baseProfile, stepOffset = 0 }: HyroxOnboardingProps) {
+  const firstStep = baseProfile ? 2 : 1;
+  const [step, setStep] = useState<number>(firstStep);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
   }, [step]);
 
-  const [age, setAge] = useState<string>("30");
-  const [sex, setSex] = useState<"M" | "F">("M");
-  const [height, setHeight] = useState<string>("175");
-  const [weight, setWeight] = useState<string>("75");
+  const stepLabel = (n: number) => n + stepOffset;
+
+  const [age, setAge] = useState<string>(baseProfile ? String(baseProfile.age) : "30");
+  const [sex, setSex] = useState<"M" | "F">(baseProfile?.sex ?? "M");
+  const [height, setHeight] = useState<string>(baseProfile ? String(baseProfile.height) : "175");
+  const [weight, setWeight] = useState<string>(baseProfile ? String(baseProfile.weight) : "75");
 
   const [objective, setObjective] = useState<HyroxObjective>(HyroxObjective.PRIMERA_CARRERA);
   const [division, setDivision] = useState<HyroxDivision>(HyroxDivision.OPEN);
@@ -104,7 +109,7 @@ export default function HyroxOnboarding({ onComplete, onCancel }: HyroxOnboardin
   };
 
   const handleBack = () => {
-    if (step > 1) {
+    if (step > firstStep) {
       setStep(prev => prev - 1);
     } else {
       onCancel();
@@ -150,7 +155,7 @@ export default function HyroxOnboarding({ onComplete, onCancel }: HyroxOnboardin
             <div>
               <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
                 <User className="w-5 h-5 text-blue-600" />
-                1. PERFIL FISIOLÓGICO
+                {stepLabel(1)}. PERFIL FISIOLÓGICO
               </h3>
               <div className="space-y-1">
                 <p className="text-xs font-bold text-blue-600 uppercase tracking-wider">
@@ -229,7 +234,7 @@ export default function HyroxOnboarding({ onComplete, onCancel }: HyroxOnboardin
             <div>
               <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
                 <Target className="w-5 h-5 text-blue-600" />
-                2. OBJETIVO PRINCIPAL
+                {stepLabel(2)}. OBJETIVO PRINCIPAL
               </h3>
               <p className="text-xs text-zinc-500 font-medium leading-relaxed">
                 Selecciona la meta que quieres abordar. Esto determinará la estructura de tu plan completo.
@@ -278,7 +283,7 @@ export default function HyroxOnboarding({ onComplete, onCancel }: HyroxOnboardin
             <div>
               <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
                 <Gauge className="w-5 h-5 text-blue-600" />
-                3. EXPERIENCIA Y FECHA
+                {stepLabel(3)}. EXPERIENCIA Y FECHA
               </h3>
               <p className="text-xs text-zinc-500 font-medium leading-relaxed">
                 Cuéntanos tu nivel actual de entrenamiento funcional y, si la tienes, la fecha de tu carrera.
@@ -338,7 +343,7 @@ export default function HyroxOnboarding({ onComplete, onCancel }: HyroxOnboardin
             <div>
               <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
                 <Dumbbell className="w-5 h-5 text-blue-600" />
-                4. EQUIPO Y ESTACIONES
+                {stepLabel(4)}. EQUIPO Y ESTACIONES
               </h3>
               <p className="text-xs text-zinc-500 font-medium leading-relaxed">
                 Indica a qué equipamiento tienes acceso y en qué estaciones te sientes más débil.
@@ -406,7 +411,7 @@ export default function HyroxOnboarding({ onComplete, onCancel }: HyroxOnboardin
             <div>
               <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
                 <ShieldAlert className="w-5 h-5 text-blue-600" />
-                5. FRECUENCIA Y LESIONES
+                {stepLabel(5)}. FRECUENCIA Y LESIONES
               </h3>
               <p className="text-xs uppercase tracking-wider text-zinc-500 font-bold">
                 Ajustemos la frecuencia semanal e historial de molestias para evitar lesiones en tu plan.
