@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from "motion/react";
 import App from "./App";
 import HyroxApp from "./HyroxApp";
 import Landing from "./Landing";
-import ProfileStep, { BaseProfile } from "./ProfileStep";
 import DisciplineSelect, { Discipline } from "./DisciplineSelect";
 import Onboarding from "./Onboarding";
 import HyroxOnboarding from "./HyroxOnboarding";
@@ -14,30 +13,11 @@ import { generateHyroxPlan } from "./hyroxEngine";
 
 type Stage =
   | "landing"
-  | "profile"
   | "discipline"
   | "onboarding-running"
   | "onboarding-hyrox"
   | "app-running"
   | "app-hyrox";
-
-function getStoredProfile(): BaseProfile | null {
-  try {
-    const run = localStorage.getItem("run_plan_onboarding");
-    if (run) {
-      const data = JSON.parse(run);
-      return { age: data.age, sex: data.sex === "F" ? "F" : "M", height: data.height, weight: data.weight };
-    }
-    const hyrox = localStorage.getItem("hyrox_plan_onboarding");
-    if (hyrox) {
-      const data = JSON.parse(hyrox);
-      return { age: data.age, sex: data.sex === "F" ? "F" : "M", height: data.height, weight: data.weight };
-    }
-  } catch (e) {
-    console.error("Error reading stored profile:", e);
-  }
-  return null;
-}
 
 function resolveBootStage(): Stage {
   try {
@@ -54,7 +34,6 @@ function resolveBootStage(): Stage {
 
 export default function Root() {
   const [stage, setStage] = useState<Stage>(() => resolveBootStage());
-  const [profile, setProfile] = useState<BaseProfile | null>(null);
 
   const handleCompleteRunning = (data: OnboardingData) => {
     const plan = generateTrainingPlan(data);
@@ -93,11 +72,7 @@ export default function Root() {
     // gym / salud: intentionally no-op for now
   };
 
-  const handleSwitchApp = () => {
-    const stored = profile ?? getStoredProfile();
-    if (stored) setProfile(stored);
-    setStage("discipline");
-  };
+  const handleSwitchApp = () => setStage("discipline");
 
   if (stage === "app-running") return <App onSwitchApp={handleSwitchApp} />;
   if (stage === "app-hyrox") return <HyroxApp onSwitchApp={handleSwitchApp} />;
@@ -111,7 +86,7 @@ export default function Root() {
           {stage === "landing" && (
             <motion.div key="landing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
               <Landing
-                onStartOnboarding={() => setStage("profile")}
+                onStartOnboarding={() => setStage("discipline")}
                 hasPlan={hasAnyPlan}
                 onGoToDashboard={() => {
                   const activeApp = localStorage.getItem("elevr_active_app");
@@ -125,29 +100,16 @@ export default function Root() {
             </motion.div>
           )}
 
-          {stage === "profile" && (
-            <motion.div key="profile" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-              <ProfileStep
-                onNext={(p) => {
-                  setProfile(p);
-                  setStage("discipline");
-                }}
-                onBack={() => setStage("landing")}
-              />
-            </motion.div>
-          )}
-
           {stage === "discipline" && (
             <motion.div key="discipline" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-              <DisciplineSelect onSelect={handleSelectDiscipline} onBack={() => setStage("profile")} />
+              <DisciplineSelect onSelect={handleSelectDiscipline} onBack={() => setStage("landing")} />
             </motion.div>
           )}
 
           {stage === "onboarding-running" && (
             <motion.div key="onboarding-running" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
               <Onboarding
-                baseProfile={profile ?? undefined}
-                stepOffset={profile ? 1 : 0}
+                stepOffset={1}
                 onComplete={handleCompleteRunning}
                 onCancel={() => setStage("discipline")}
               />
@@ -157,8 +119,7 @@ export default function Root() {
           {stage === "onboarding-hyrox" && (
             <motion.div key="onboarding-hyrox" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
               <HyroxOnboarding
-                baseProfile={profile ?? undefined}
-                stepOffset={profile ? 1 : 0}
+                stepOffset={1}
                 onComplete={handleCompleteHyrox}
                 onCancel={() => setStage("discipline")}
               />

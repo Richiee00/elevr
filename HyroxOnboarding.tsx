@@ -23,13 +23,11 @@ import {
 interface HyroxOnboardingProps {
   onComplete: (data: HyroxOnboardingData) => void;
   onCancel: () => void;
-  baseProfile?: { age: number; sex: "M" | "F"; height: number; weight: number };
   stepOffset?: number;
 }
 
-export default function HyroxOnboarding({ onComplete, onCancel, baseProfile, stepOffset = 0 }: HyroxOnboardingProps) {
-  const firstStep = baseProfile ? 2 : 1;
-  const [step, setStep] = useState<number>(firstStep);
+export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }: HyroxOnboardingProps) {
+  const [step, setStep] = useState<number>(1);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -37,10 +35,10 @@ export default function HyroxOnboarding({ onComplete, onCancel, baseProfile, ste
 
   const stepLabel = (n: number) => n + stepOffset;
 
-  const [age, setAge] = useState<string>(baseProfile ? String(baseProfile.age) : "30");
-  const [sex, setSex] = useState<"M" | "F">(baseProfile?.sex ?? "M");
-  const [height, setHeight] = useState<string>(baseProfile ? String(baseProfile.height) : "175");
-  const [weight, setWeight] = useState<string>(baseProfile ? String(baseProfile.weight) : "75");
+  const [age, setAge] = useState<string>("30");
+  const [sex, setSex] = useState<"M" | "F">("M");
+  const [height, setHeight] = useState<string>("175");
+  const [weight, setWeight] = useState<string>("75");
 
   const [objective, setObjective] = useState<HyroxObjective>(HyroxObjective.PRIMERA_CARRERA);
   const [division, setDivision] = useState<HyroxDivision>(HyroxDivision.OPEN);
@@ -109,7 +107,7 @@ export default function HyroxOnboarding({ onComplete, onCancel, baseProfile, ste
   };
 
   const handleBack = () => {
-    if (step > firstStep) {
+    if (step > 1) {
       setStep(prev => prev - 1);
     } else {
       onCancel();

@@ -54,7 +54,7 @@ export default function DisciplineSelect({ onSelect, onBack }: DisciplineSelectP
         <div>
           <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
             <Compass className="w-5 h-5 text-blue-600" />
-            2. DISCIPLINA
+            1. DISCIPLINA
           </h3>
           <p className="text-xs text-zinc-500 font-medium leading-relaxed">
             Selecciona qué quieres entrenar. Esto determinará el resto de tu plan personalizado.
