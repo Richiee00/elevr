@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { HyroxTrainingPlan, HyroxCategory } from "./hyroxTypes";
 import { getTemplateById, CATEGORY_LABELS } from "./hyroxLibrary";
+import { formatDateEU } from "./engines";
 import { ChevronLeft, ChevronRight, CalendarCheck2, CheckCircle2 } from "lucide-react";
 
 interface HyroxCalendarViewProps {
@@ -168,7 +169,9 @@ export default function HyroxCalendarView({ plan, completedWorkouts }: HyroxCale
 
       {selectedSession && (
         <div className="bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-sm">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-2">{selectedDayStr}</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-2">
+            {selectedDayStr ? formatDateEU(`${selectedDayStr}T00:00:00`) : ""}
+          </p>
           {selectedSession.category === "descanso" || !selectedTemplate ? (
             <p className="text-sm font-bold text-zinc-600">Descanso / Movilidad</p>
           ) : (

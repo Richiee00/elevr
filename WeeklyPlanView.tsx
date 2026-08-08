@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { TrainingPlan, WorkoutSession, WeeklyPlan, DailyReadinessInput, DailyReadinessScore } from "./types";
-import { calculateReadiness, runDailyExecutionEngine } from "./engines";
+import { calculateReadiness, runDailyExecutionEngine, formatDateEU } from "./engines";
 import { 
   Calendar, 
   Dumbbell, 
@@ -659,7 +659,7 @@ export default function WeeklyPlanView({
                         </span>
                       </div>
                       <span className="text-[10px] text-emerald-600 font-mono">
-                        {new Date(loggedFeedback.date).toLocaleDateString()}
+                        {formatDateEU(loggedFeedback.date)}
                       </span>
                     </div>
                   ) : session.type === "descanso" ? (

@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { HyroxOnboardingData, HyroxObjective, HyroxTrainingPlan } from "./hyroxTypes";
 import { STATION_LABELS } from "./hyroxLibrary";
 import { calculateBMI } from "./hyroxEngine";
+import { formatDateEU } from "./engines";
 import { User, Activity, Check, Calendar, TrendingUp, Flag, Dumbbell } from "lucide-react";
 
 interface HyroxProfileViewProps {
@@ -224,7 +225,7 @@ export default function HyroxProfileView({ onboarding, plan, onUpdateProfile, co
             <p className="text-xs text-zinc-500 font-medium mt-1">División: {onboarding.division.toUpperCase()}</p>
             {onboarding.raceDate && (
               <p className="text-xs text-zinc-500 font-medium mt-1 flex items-center gap-1">
-                <Calendar className="w-3 h-3" /> Carrera el {new Date(onboarding.raceDate).toLocaleDateString()}
+                <Calendar className="w-3 h-3" /> Carrera el {formatDateEU(onboarding.raceDate)}
               </p>
             )}
           </div>

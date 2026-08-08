@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { HyroxBlock, HyroxExercise, HyroxWorkoutTemplate } from "./hyroxTypes";
 import { STATION_LABELS, CATEGORY_LABELS } from "./hyroxLibrary";
 import { blockFormatLabel, parseDurationToSeconds } from "./hyroxEngine";
+import { formatDateEU } from "./engines";
 import {
   Clock,
   Dumbbell,
@@ -190,7 +191,7 @@ export default function HyroxWorkoutDetail({
               Reportado como <strong className="text-emerald-700 capitalize">{loggedFeedback.feedback.replace("_", " ")}</strong> con RPE de{" "}
               <strong className="text-emerald-700">{loggedFeedback.rpe}/10</strong>.
             </span>
-            <span className="text-[10px] text-emerald-600 font-mono">{new Date(loggedFeedback.date).toLocaleDateString()}</span>
+            <span className="text-[10px] text-emerald-600 font-mono">{formatDateEU(loggedFeedback.date)}</span>
           </div>
         )}
 

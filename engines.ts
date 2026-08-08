@@ -57,6 +57,16 @@ export function secondsToPace(secs: number): string {
   return `${m}:${s.toString().padStart(2, "0")}/km`;
 }
 
+// Formats a date as dd/mm/aaaa (European format), independent of browser locale.
+export function formatDateEU(dateInput: string | Date): string {
+  const d = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+  if (isNaN(d.getTime())) return "--/--/----";
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
 // ============================================================================
 // MÓDULO 1 & 6: CALCULO DE READINESS Y COMPOSICIÓN CORPORAL
 // ============================================================================

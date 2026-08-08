@@ -26,6 +26,24 @@ interface HyroxOnboardingProps {
   stepOffset?: number;
 }
 
+function formatEUDateInput(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 8);
+  const day = digits.slice(0, 2);
+  const month = digits.slice(2, 4);
+  const year = digits.slice(4, 8);
+  let out = day;
+  if (month) out += "/" + month;
+  if (year) out += "/" + year;
+  return out;
+}
+
+function parseEUDateToISO(value: string): string | undefined {
+  const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return undefined;
+  const [, dd, mm, yyyy] = match;
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }: HyroxOnboardingProps) {
   const [step, setStep] = useState<number>(1);
 
@@ -44,7 +62,7 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
   const [division, setDivision] = useState<HyroxDivision>(HyroxDivision.OPEN);
 
   const [experienceLevel, setExperienceLevel] = useState<HyroxExperienceLevel>(HyroxExperienceLevel.INTERMEDIO);
-  const [raceDate, setRaceDate] = useState<string>("");
+  const [raceDateInput, setRaceDateInput] = useState<string>("");
 
   const [equipmentAccess, setEquipmentAccess] = useState<HyroxStation[]>([...HYROX_STATIONS_ORDER, "bike_erg", "general"]);
   const [weakStations, setWeakStations] = useState<HyroxStation[]>([]);
@@ -93,7 +111,7 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
         objective,
         division,
         experienceLevel,
-        raceDate: raceDate || undefined,
+        raceDate: parseEUDateToISO(raceDateInput),
         frequency,
         equipmentAccess,
         weakStations,
@@ -152,87 +170,8 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
           >
             <div>
               <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
-                <User className="w-5 h-5 text-blue-600" />
-                {stepLabel(1)}. PERFIL FISIOLÓGICO
-              </h3>
-              <div className="space-y-1">
-                <p className="text-xs font-bold text-blue-600 uppercase tracking-wider">
-                  Tu plan Hyrox no será estático.
-                </p>
-                <p className="text-xs text-zinc-500 font-medium leading-relaxed">
-                  Conocer tu perfil nos permite calibrar cargas de fuerza, máquinas y carrera a tu nivel real.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-2">
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 block">Edad (Años)</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={age}
-                  onChange={(e) => setAge(cleanNumericInput(e.target.value))}
-                  className="w-full bg-white border border-zinc-200/80 rounded-xl px-4 py-3 text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 block">Sexo Biológico</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(["M", "F"] as const).map(s => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setSex(s)}
-                      className={`py-3 text-center rounded-xl border font-black uppercase tracking-wider text-xs transition cursor-pointer ${
-                        sex === s ? "bg-black border-black text-white" : "bg-white border-zinc-200/80 hover:border-zinc-300 text-zinc-600"
-                      }`}
-                    >
-                      {s === "M" ? "Masc" : "Fem"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 block">Altura (cm)</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={height}
-                  onChange={(e) => setHeight(cleanNumericInput(e.target.value))}
-                  className="w-full bg-white border border-zinc-200/80 rounded-xl px-4 py-3 text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 block">Peso (kg)</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={weight}
-                  onChange={(e) => setWeight(cleanNumericInput(e.target.value))}
-                  className="w-full bg-white border border-zinc-200/80 rounded-xl px-4 py-3 text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold"
-                />
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {step === 2 && (
-          <motion.div
-            key="step2"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.3 }}
-            className="space-y-6"
-          >
-            <div>
-              <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
                 <Target className="w-5 h-5 text-blue-600" />
-                {stepLabel(2)}. OBJETIVO PRINCIPAL
+                {stepLabel(1)}. OBJETIVO PRINCIPAL
               </h3>
               <p className="text-xs text-zinc-500 font-medium leading-relaxed">
                 Selecciona la meta que quieres abordar. Esto determinará la estructura de tu plan completo.
@@ -269,9 +208,9 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
           </motion.div>
         )}
 
-        {step === 3 && (
+        {step === 2 && (
           <motion.div
-            key="step3"
+            key="step2"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
@@ -281,7 +220,7 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
             <div>
               <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
                 <Gauge className="w-5 h-5 text-blue-600" />
-                {stepLabel(3)}. EXPERIENCIA Y FECHA
+                {stepLabel(2)}. EXPERIENCIA Y FECHA
               </h3>
               <p className="text-xs text-zinc-500 font-medium leading-relaxed">
                 Cuéntanos tu nivel actual de entrenamiento funcional y, si la tienes, la fecha de tu carrera.
@@ -317,10 +256,13 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
                 <span className="text-[9px] bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full font-bold border border-blue-100">Recomendado</span>
               </label>
               <input
-                type="date"
-                value={raceDate}
-                onChange={(e) => setRaceDate(e.target.value)}
-                className="w-full bg-white border border-zinc-200/80 rounded-xl px-4 py-3 text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold"
+                type="text"
+                inputMode="numeric"
+                value={raceDateInput}
+                onChange={(e) => setRaceDateInput(formatEUDateInput(e.target.value))}
+                placeholder="dd/mm/aaaa"
+                maxLength={10}
+                className="w-full bg-white border border-zinc-200/80 rounded-xl px-4 py-3 text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold font-mono"
               />
               <p className="text-xs text-zinc-500 leading-relaxed font-medium">
                 Si la indicas, calculamos la duración exacta del plan hasta esa fecha. Si no, generamos un bloque estándar de 8 semanas.
@@ -329,9 +271,9 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
           </motion.div>
         )}
 
-        {step === 4 && (
+        {step === 3 && (
           <motion.div
-            key="step4"
+            key="step3"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
@@ -341,7 +283,7 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
             <div>
               <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
                 <Dumbbell className="w-5 h-5 text-blue-600" />
-                {stepLabel(4)}. EQUIPO Y ESTACIONES
+                {stepLabel(3)}. EQUIPO Y ESTACIONES
               </h3>
               <p className="text-xs text-zinc-500 font-medium leading-relaxed">
                 Indica a qué equipamiento tienes acceso y en qué estaciones te sientes más débil.
@@ -397,9 +339,9 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
           </motion.div>
         )}
 
-        {step === 5 && (
+        {step === 4 && (
           <motion.div
-            key="step5"
+            key="step4"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
@@ -409,7 +351,7 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
             <div>
               <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
                 <ShieldAlert className="w-5 h-5 text-blue-600" />
-                {stepLabel(5)}. FRECUENCIA Y LESIONES
+                {stepLabel(4)}. FRECUENCIA Y LESIONES
               </h3>
               <p className="text-xs uppercase tracking-wider text-zinc-500 font-bold">
                 Ajustemos la frecuencia semanal e historial de molestias para evitar lesiones en tu plan.
@@ -491,6 +433,80 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
                     />
                   </motion.div>
                 )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {step === 5 && (
+          <motion.div
+            key="step5"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-6"
+          >
+            <div>
+              <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
+                <User className="w-5 h-5 text-blue-600" />
+                {stepLabel(5)}. PERFIL FISIOLÓGICO
+              </h3>
+              <p className="text-xs text-zinc-500 font-medium leading-relaxed">
+                Conocer tu perfil nos permite calibrar cargas de fuerza, máquinas y carrera a tu nivel real.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-2">
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 block">Edad (Años)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={age}
+                  onChange={(e) => setAge(cleanNumericInput(e.target.value))}
+                  className="w-full bg-white border border-zinc-200/80 rounded-xl px-4 py-3 text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 block">Sexo Biológico</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["M", "F"] as const).map(s => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setSex(s)}
+                      className={`py-3 text-center rounded-xl border font-black uppercase tracking-wider text-xs transition cursor-pointer ${
+                        sex === s ? "bg-black border-black text-white" : "bg-white border-zinc-200/80 hover:border-zinc-300 text-zinc-600"
+                      }`}
+                    >
+                      {s === "M" ? "Masc" : "Fem"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 block">Altura (cm)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={height}
+                  onChange={(e) => setHeight(cleanNumericInput(e.target.value))}
+                  className="w-full bg-white border border-zinc-200/80 rounded-xl px-4 py-3 text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 block">Peso (kg)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={weight}
+                  onChange={(e) => setWeight(cleanNumericInput(e.target.value))}
+                  className="w-full bg-white border border-zinc-200/80 rounded-xl px-4 py-3 text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold"
+                />
               </div>
             </div>
           </motion.div>
