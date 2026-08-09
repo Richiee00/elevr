@@ -1,11 +1,16 @@
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  HyroxObjective,
   HyroxDivision,
   HyroxExperienceLevel,
   HyroxFrequencyOption,
+  HyroxGymType,
+  HyroxLimitantType,
+  HyroxObjective,
   HyroxOnboardingData,
+  HyroxPerformanceData,
+  HyroxRaceCategory,
+  HyroxSessionDurationMin,
   HyroxStation
 } from "./hyroxTypes";
 import { STATION_LABELS, HYROX_STATIONS_ORDER } from "./hyroxLibrary";
@@ -17,7 +22,10 @@ import {
   Target,
   Gauge,
   Dumbbell,
-  ShieldAlert
+  ShieldAlert,
+  Flag,
+  Timer,
+  Compass
 } from "lucide-react";
 
 interface HyroxOnboardingProps {
@@ -25,6 +33,70 @@ interface HyroxOnboardingProps {
   onCancel: () => void;
   stepOffset?: number;
 }
+
+type StepKey = "objetivo" | "categoria" | "experiencia" | "fecha" | "rendimiento" | "camino" | "gimnasio" | "frecuencia_lesiones" | "perfil";
+
+const CAMINO_OBJECTIVES = [
+  HyroxObjective.MEJORAR_ESTACIONES,
+  HyroxObjective.MEJORAR_RESISTENCIA,
+  HyroxObjective.DOBLES,
+  HyroxObjective.VOLVER_PAUSA
+];
+
+function getStepsForObjective(objective: HyroxObjective): StepKey[] {
+  const steps: StepKey[] = ["objetivo"];
+  if (objective !== HyroxObjective.BASE_GENERAL) steps.push("categoria");
+  steps.push("experiencia");
+  if (objective !== HyroxObjective.BASE_GENERAL) steps.push("fecha");
+  if (objective === HyroxObjective.MEJORAR_MARCA) steps.push("rendimiento");
+  else if (CAMINO_OBJECTIVES.includes(objective)) steps.push("camino");
+  steps.push("gimnasio", "frecuencia_lesiones", "perfil");
+  return steps;
+}
+
+const STEP_TITLES: Record<StepKey, string> = {
+  objetivo: "OBJETIVO PRINCIPAL",
+  categoria: "CATEGORÍA DE COMPETICIÓN",
+  experiencia: "EXPERIENCIA Y ACTIVIDAD",
+  fecha: "FECHA DE COMPETICIÓN",
+  rendimiento: "DATOS DE RENDIMIENTO",
+  camino: "TU SITUACIÓN ACTUAL",
+  gimnasio: "TU GIMNASIO",
+  frecuencia_lesiones: "FRECUENCIA Y LESIONES",
+  perfil: "PERFIL FISIOLÓGICO"
+};
+
+const RACE_CATEGORY_OPTIONS: Array<{ val: HyroxRaceCategory; label: string; group: string }> = [
+  { val: "open_masculina", label: "Open Masculina", group: "Open" },
+  { val: "open_femenina", label: "Open Femenina", group: "Open" },
+  { val: "pro_masculina", label: "Pro Masculina", group: "Pro" },
+  { val: "pro_femenina", label: "Pro Femenina", group: "Pro" },
+  { val: "dobles_masculina_open", label: "Dobles Masculina Open", group: "Dobles Open" },
+  { val: "dobles_femenina_open", label: "Dobles Femenina Open", group: "Dobles Open" },
+  { val: "dobles_mixtos", label: "Dobles Mixtos", group: "Dobles Open" },
+  { val: "dobles_masculina_pro", label: "Dobles Masculina Pro", group: "Dobles Pro" },
+  { val: "dobles_femenina_pro", label: "Dobles Femenina Pro", group: "Dobles Pro" }
+];
+
+function deriveDivision(category: HyroxRaceCategory): HyroxDivision {
+  if (category.startsWith("dobles")) return HyroxDivision.DOUBLES;
+  if (category.startsWith("pro")) return HyroxDivision.PRO;
+  return HyroxDivision.OPEN;
+}
+
+const OBJECTIVE_OPTIONS: Array<{ val: HyroxObjective; title: string; desc: string }> = [
+  { val: HyroxObjective.PRIMERA_CARRERA, title: "Preparar mi primer HYROX", desc: "Nunca he competido. Quiero llegar a la línea de salida con garantías." },
+  { val: HyroxObjective.MEJORAR_MARCA, title: "Mejorar mi marca en HYROX", desc: "Ya he competido y tengo mis tiempos. Quiero bajar mi tiempo total." },
+  { val: HyroxObjective.CATEGORIA_CONCRETA, title: "Preparar una categoría concreta", desc: "Quiero prepararme específicamente para una categoría/división." },
+  { val: HyroxObjective.MEJORAR_CARRERA_ESTACIONES, title: "Mejorar la carrera entre estaciones", desc: "Se me cae el ritmo de carrera cuando encadeno con las estaciones." },
+  { val: HyroxObjective.MEJORAR_ESTACIONES, title: "Mejorar las estaciones funcionales", desc: "Las estaciones me cuestan más que la carrera." },
+  { val: HyroxObjective.MEJORAR_TRANSICIONES, title: "Mejorar las transiciones", desc: "Pierdo mucho tiempo al entrar y salir de cada estación." },
+  { val: HyroxObjective.DOBLES, title: "Competir en modalidad Dobles", desc: "Voy a competir en pareja/equipo." },
+  { val: HyroxObjective.MEJORAR_RESISTENCIA, title: "Mejorar la resistencia general", desc: "Quiero aguantar mejor el conjunto de la prueba." },
+  { val: HyroxObjective.VOLVER_PAUSA, title: "Volver a entrenar tras una pausa", desc: "He estado un tiempo parado y quiero retomar con cabeza." },
+  { val: HyroxObjective.POCO_TIEMPO, title: "Preparar una competición próxima con poco tiempo", desc: "Tengo una carrera cerca y poco margen de preparación." },
+  { val: HyroxObjective.BASE_GENERAL, title: "Base de fuerza y acondicionamiento", desc: "Sin carrera fijada. Quiero mejorar mi condición física funcional." }
+];
 
 function formatEUDateInput(raw: string): string {
   const digits = raw.replace(/\D/g, "").slice(0, 8);
@@ -44,329 +116,534 @@ function parseEUDateToISO(value: string): string | undefined {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function ThreeTierSelector<T extends string>({
+  label,
+  value,
+  onChange,
+  options
+}: {
+  label: string;
+  value: T;
+  onChange: (v: T) => void;
+  options: Array<{ val: T; label: string }>;
+}) {
+  return (
+    <div className="space-y-2">
+      <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 block">{label}</label>
+      <div className="grid grid-cols-3 gap-2">
+        {options.map(o => (
+          <button
+            key={o.val}
+            type="button"
+            onClick={() => onChange(o.val)}
+            className={`py-2.5 text-center rounded-xl border font-bold uppercase tracking-wider text-[11px] transition cursor-pointer ${
+              value === o.val ? "bg-blue-50 border-blue-600 text-blue-900 shadow-sm" : "bg-white border-zinc-200/80 hover:border-zinc-300 text-zinc-600"
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TimeInput({ label, value, onChange, placeholder = "mm:ss" }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 block">{label}</label>
+      <input
+        type="text"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full bg-white border border-zinc-200/80 rounded-xl px-3 py-2.5 text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold font-mono text-sm"
+      />
+    </div>
+  );
+}
+
 export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }: HyroxOnboardingProps) {
-  const [step, setStep] = useState<number>(1);
+  const [objective, setObjective] = useState<HyroxObjective>(HyroxObjective.PRIMERA_CARRERA);
+  const steps = useMemo(() => getStepsForObjective(objective), [objective]);
+  const [stepIdx, setStepIdx] = useState(0);
+  const stepKey = steps[stepIdx];
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
-  }, [step]);
+  }, [stepIdx]);
+
+  useEffect(() => {
+    // Si cambia el objetivo y el paso actual ya no existe en la nueva secuencia, volvemos al principio del contenido restante.
+    setStepIdx(prev => Math.min(prev, steps.length - 1));
+  }, [steps.length]);
 
   const stepLabel = (n: number) => n + stepOffset;
 
-  const [age, setAge] = useState<string>("30");
-  const [sex, setSex] = useState<"M" | "F">("M");
-  const [height, setHeight] = useState<string>("175");
-  const [weight, setWeight] = useState<string>("75");
-
-  const [objective, setObjective] = useState<HyroxObjective>(HyroxObjective.PRIMERA_CARRERA);
-  const [division, setDivision] = useState<HyroxDivision>(HyroxDivision.OPEN);
-
+  const [raceCategory, setRaceCategory] = useState<HyroxRaceCategory>("open_masculina");
   const [experienceLevel, setExperienceLevel] = useState<HyroxExperienceLevel>(HyroxExperienceLevel.INTERMEDIO);
+  const [runningExperience, setRunningExperience] = useState<HyroxExperienceLevel>(HyroxExperienceLevel.INTERMEDIO);
+  const [strengthExperience, setStrengthExperience] = useState<HyroxExperienceLevel>(HyroxExperienceLevel.INTERMEDIO);
+  const [dailyActivityLevel, setDailyActivityLevel] = useState<"sedentario" | "moderado" | "activo">("moderado");
   const [raceDateInput, setRaceDateInput] = useState<string>("");
 
-  const [equipmentAccess, setEquipmentAccess] = useState<HyroxStation[]>([...HYROX_STATIONS_ORDER, "bike_erg", "general"]);
-  const [weakStations, setWeakStations] = useState<HyroxStation[]>([]);
+  // Rendimiento (solo MEJORAR_MARCA)
+  const [totalTime, setTotalTime] = useState("");
+  const [runSplits, setRunSplits] = useState<string[]>(Array(8).fill(""));
+  const [skiErg, setSkiErg] = useState("");
+  const [sledPush, setSledPush] = useState("");
+  const [sledPull, setSledPull] = useState("");
+  const [burpeeBroadJump, setBurpeeBroadJump] = useState("");
+  const [row, setRow] = useState("");
+  const [farmersCarry, setFarmersCarry] = useState("");
+  const [sandbagLunges, setSandbagLunges] = useState("");
+  const [wallBalls, setWallBalls] = useState("");
+  const [roxzoneTotal, setRoxzoneTotal] = useState("");
 
+  // Camino cualitativo (resto de objetivos)
+  const [estacionesTipo, setEstacionesTipo] = useState<HyroxLimitantType>("fuerza_maxima");
+  const [resistenciaTipo, setResistenciaTipo] = useState<HyroxLimitantType>("carrera");
+  const [doublesRole, setDoublesRole] = useState<"carrera" | "fuerza" | "equilibrado">("equilibrado");
+  const [breakDuration, setBreakDuration] = useState<"menos_1_mes" | "1_3_meses" | "mas_3_meses">("1_3_meses");
+  const [weakStationsSelfReported, setWeakStationsSelfReported] = useState<HyroxStation[]>([]);
+
+  const [gymType, setGymType] = useState<HyroxGymType>("especializado");
   const [frequency, setFrequency] = useState<HyroxFrequencyOption>(HyroxFrequencyOption.FREQ_3);
-  const [activeInjury, setActiveInjury] = useState<boolean>(false);
+  const [sessionDurationMin, setSessionDurationMin] = useState<HyroxSessionDurationMin>(60);
+  const [activeInjury, setActiveInjury] = useState(false);
   const [injuryAreas, setInjuryAreas] = useState<string[]>([]);
-  const [injuryNotes, setInjuryNotes] = useState<string>("");
+  const [injuryNotes, setInjuryNotes] = useState("");
 
-  const cleanNumericInput = (value: string) => {
-    const onlyDigits = value.replace(/\D/g, "");
-    return onlyDigits.replace(/^0+(?=\d)/, "");
-  };
+  const [age, setAge] = useState("30");
+  const [sex, setSex] = useState<"M" | "F">("M");
+  const [height, setHeight] = useState("175");
+  const [weight, setWeight] = useState("75");
 
+  const cleanNumericInput = (value: string) => value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
   const getSafeNumber = (value: string, fallback: number) => {
     if (value.trim() === "") return fallback;
     const n = Number(value);
     return Number.isFinite(n) && n > 0 ? n : fallback;
   };
 
-  const toggleStationInList = (list: HyroxStation[], setList: (v: HyroxStation[]) => void, station: HyroxStation) => {
-    if (list.includes(station)) {
-      setList(list.filter(s => s !== station));
-    } else {
-      setList([...list, station]);
-    }
+  const toggleInjuryArea = (area: string) => {
+    setInjuryAreas(prev => (prev.includes(area) ? prev.filter(a => a !== area) : [...prev, area]));
   };
 
-  const toggleInjuryArea = (area: string) => {
-    if (injuryAreas.includes(area)) {
-      setInjuryAreas(prev => prev.filter(a => a !== area));
-    } else {
-      setInjuryAreas(prev => [...prev, area]);
-    }
+  const toggleWeakStation = (station: HyroxStation) => {
+    setWeakStationsSelfReported(prev => (prev.includes(station) ? prev.filter(s => s !== station) : [...prev, station]));
   };
 
   const handleNext = () => {
-    if (step < 5) {
-      setStep(prev => prev + 1);
-    } else {
-      const data: HyroxOnboardingData = {
-        age: getSafeNumber(age, 30),
-        sex,
-        height: getSafeNumber(height, 175),
-        weight: getSafeNumber(weight, 75),
-        objective,
-        division,
-        experienceLevel,
-        raceDate: parseEUDateToISO(raceDateInput),
-        frequency,
-        equipmentAccess,
-        weakStations,
-        activeInjury,
-        injuryAreas,
-        injuryNotes: injuryNotes || undefined,
-        completedAt: new Date().toISOString()
-      };
-      onComplete(data);
+    if (stepIdx < steps.length - 1) {
+      setStepIdx(prev => prev + 1);
+      return;
     }
+
+    let selfReportedLimitant: HyroxLimitantType | undefined;
+    if (objective === HyroxObjective.MEJORAR_CARRERA_ESTACIONES) selfReportedLimitant = "carrera";
+    else if (objective === HyroxObjective.MEJORAR_TRANSICIONES) selfReportedLimitant = "transiciones";
+    else if (objective === HyroxObjective.MEJORAR_ESTACIONES) selfReportedLimitant = estacionesTipo;
+    else if (objective === HyroxObjective.MEJORAR_RESISTENCIA) selfReportedLimitant = resistenciaTipo;
+
+    const performance: HyroxPerformanceData | undefined =
+      objective === HyroxObjective.MEJORAR_MARCA
+        ? { totalTime, runSplits, skiErg, sledPush, sledPull, burpeeBroadJump, row, farmersCarry, sandbagLunges, wallBalls, roxzoneTotal }
+        : undefined;
+
+    const data: HyroxOnboardingData = {
+      age: getSafeNumber(age, 30),
+      sex,
+      height: getSafeNumber(height, 175),
+      weight: getSafeNumber(weight, 75),
+      objective,
+      raceCategory,
+      division: deriveDivision(raceCategory),
+      experienceLevel,
+      runningExperience,
+      strengthExperience,
+      dailyActivityLevel,
+      raceDate: parseEUDateToISO(raceDateInput),
+      gymType,
+      frequency,
+      sessionDurationMin,
+      performance,
+      selfReportedLimitant,
+      weakStationsSelfReported: objective === HyroxObjective.MEJORAR_ESTACIONES ? weakStationsSelfReported : undefined,
+      doublesRole: objective === HyroxObjective.DOBLES ? doublesRole : undefined,
+      breakDuration: objective === HyroxObjective.VOLVER_PAUSA ? breakDuration : undefined,
+      activeInjury,
+      injuryAreas,
+      injuryNotes: injuryNotes || undefined,
+      completedAt: new Date().toISOString()
+    };
+
+    onComplete(data);
   };
 
   const handleBack = () => {
-    if (step > 1) {
-      setStep(prev => prev - 1);
-    } else {
-      onCancel();
-    }
+    if (stepIdx > 0) setStepIdx(prev => prev - 1);
+    else onCancel();
   };
 
-  const renderObjectiveCard = (objVal: HyroxObjective, title: string, desc: string) => {
-    const isSelected = objective === objVal;
+  const displayNumber = stepLabel(stepIdx + 1);
+
+  const renderObjectiveCard = (opt: { val: HyroxObjective; title: string; desc: string }) => {
+    const isSelected = objective === opt.val;
     return (
       <div
-        onClick={() => setObjective(objVal)}
+        key={opt.val}
+        onClick={() => setObjective(opt.val)}
         className={`p-4 rounded-2xl border text-left cursor-pointer transition flex items-start gap-4 ${
-          isSelected
-            ? "bg-blue-50/80 border-blue-600 text-blue-900 shadow-sm"
-            : "bg-white border-zinc-200/80 hover:border-zinc-300 text-zinc-700"
+          isSelected ? "bg-blue-50/80 border-blue-600 text-blue-900 shadow-sm" : "bg-white border-zinc-200/80 hover:border-zinc-300 text-zinc-700"
         }`}
       >
-        <div className={`p-2 rounded-xl ${isSelected ? "bg-blue-600 text-white" : "bg-zinc-100 text-zinc-500"}`}>
+        <div className={`p-2 rounded-xl shrink-0 ${isSelected ? "bg-blue-600 text-white" : "bg-zinc-100 text-zinc-500"}`}>
           <Target className="w-4 h-4" />
         </div>
         <div>
-          <h4 className={`font-black uppercase tracking-wide mb-1 text-xs sm:text-sm ${isSelected ? "text-blue-900" : "text-zinc-900"}`}>
-            {title}
-          </h4>
-          <p className="text-xs text-zinc-500 font-medium leading-relaxed">{desc}</p>
+          <h4 className={`font-black uppercase tracking-wide mb-1 text-xs sm:text-sm ${isSelected ? "text-blue-900" : "text-zinc-900"}`}>{opt.title}</h4>
+          <p className="text-xs text-zinc-500 font-medium leading-relaxed">{opt.desc}</p>
         </div>
       </div>
     );
   };
 
+  const stepIcon: Record<StepKey, React.ReactNode> = {
+    objetivo: <Target className="w-5 h-5 text-blue-600" />,
+    categoria: <Flag className="w-5 h-5 text-blue-600" />,
+    experiencia: <Gauge className="w-5 h-5 text-blue-600" />,
+    fecha: <Timer className="w-5 h-5 text-blue-600" />,
+    rendimiento: <Gauge className="w-5 h-5 text-blue-600" />,
+    camino: <Compass className="w-5 h-5 text-blue-600" />,
+    gimnasio: <Dumbbell className="w-5 h-5 text-blue-600" />,
+    frecuencia_lesiones: <ShieldAlert className="w-5 h-5 text-blue-600" />,
+    perfil: <User className="w-5 h-5 text-blue-600" />
+  };
+
   return (
     <div className="w-full text-zinc-800 relative py-2 sm:py-4">
       <AnimatePresence mode="wait">
-        {step === 1 && (
-          <motion.div
-            key="step1"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.3 }}
-            className="space-y-6"
-          >
-            <div>
-              <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
-                <Target className="w-5 h-5 text-blue-600" />
-                {stepLabel(1)}. OBJETIVO PRINCIPAL
-              </h3>
+        <motion.div
+          key={stepKey}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          transition={{ duration: 0.3 }}
+          className="space-y-6"
+        >
+          <div>
+            <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
+              {stepIcon[stepKey]}
+              {displayNumber}. {STEP_TITLES[stepKey]}
+            </h3>
+          </div>
+
+          {stepKey === "objetivo" && (
+            <>
               <p className="text-xs text-zinc-500 font-medium leading-relaxed">
                 Selecciona la meta que quieres abordar. Esto determinará la estructura de tu plan completo.
               </p>
-            </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{OBJECTIVE_OPTIONS.map(renderObjectiveCard)}</div>
+            </>
+          )}
 
-            <div className="space-y-3">
-              {renderObjectiveCard(HyroxObjective.PRIMERA_CARRERA, "Preparar mi primera carrera Hyrox", "Ideal si nunca has competido y quieres llegar a la línea de salida con garantías.")}
-              {renderObjectiveCard(HyroxObjective.MEJORAR_TIEMPO, "Mejorar mi tiempo en Hyrox", "Si ya has competido y buscas bajar tu marca con series de umbral y estaciones específicas.")}
-              {renderObjectiveCard(HyroxObjective.BASE_GENERAL, "Base de fuerza y acondicionamiento", "Sin carrera fijada. Quiero mejorar mi condición física funcional en general.")}
-            </div>
-
-            <div className="space-y-2 pt-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 block">División</label>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { val: HyroxDivision.OPEN, label: "Open" },
-                  { val: HyroxDivision.PRO, label: "Pro" },
-                  { val: HyroxDivision.DOUBLES, label: "Doubles" }
-                ].map(d => (
-                  <button
-                    key={d.val}
-                    type="button"
-                    onClick={() => setDivision(d.val)}
-                    className={`py-3 text-center rounded-xl border font-black uppercase tracking-wider text-xs transition cursor-pointer ${
-                      division === d.val ? "bg-blue-50 border-blue-600 text-blue-900 shadow-sm" : "bg-white border-zinc-200/80 hover:border-zinc-300 text-zinc-600"
-                    }`}
-                  >
-                    {d.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {step === 2 && (
-          <motion.div
-            key="step2"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.3 }}
-            className="space-y-6"
-          >
-            <div>
-              <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
-                <Gauge className="w-5 h-5 text-blue-600" />
-                {stepLabel(2)}. EXPERIENCIA Y FECHA
-              </h3>
+          {stepKey === "categoria" && (
+            <>
               <p className="text-xs text-zinc-500 font-medium leading-relaxed">
-                Cuéntanos tu nivel actual de entrenamiento funcional y, si la tienes, la fecha de tu carrera.
+                Indica la categoría de competición. La usamos para calcular tu diagnóstico y tiempos objetivo con precisión.
               </p>
-            </div>
-
-            <div className="space-y-3">
-              {[
-                { val: HyroxExperienceLevel.PRINCIPIANTE, label: "Principiante", desc: "Nunca he entrenado funcional / crossfit de forma estructurada." },
-                { val: HyroxExperienceLevel.INTERMEDIO, label: "Intermedio", desc: "Entreno funcional regularmente pero no he competido en Hyrox." },
-                { val: HyroxExperienceLevel.AVANZADO, label: "Avanzado", desc: "Ya he competido en Hyrox u oposiciones/pruebas similares." }
-              ].map(x => (
-                <button
-                  key={x.val}
-                  type="button"
-                  onClick={() => setExperienceLevel(x.val)}
-                  className={`w-full px-4 py-3.5 rounded-xl border text-left transition cursor-pointer flex justify-between items-center gap-3 ${
-                    experienceLevel === x.val ? "bg-blue-50 border-blue-600 text-blue-900" : "bg-white border-zinc-200/80 text-zinc-700 hover:border-zinc-300"
-                  }`}
-                >
-                  <div>
-                    <span className="text-xs font-black uppercase tracking-wider block">{x.label}</span>
-                    <span className="text-[11px] text-zinc-500 font-medium leading-relaxed">{x.desc}</span>
+              {["Open", "Pro", "Dobles Open", "Dobles Pro"].map(group => (
+                <div key={group} className="space-y-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 block">{group}</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {RACE_CATEGORY_OPTIONS.filter(o => o.group === group).map(o => (
+                      <button
+                        key={o.val}
+                        type="button"
+                        onClick={() => setRaceCategory(o.val)}
+                        className={`py-2.5 px-2 text-center rounded-xl border font-bold uppercase tracking-wider text-[10px] transition cursor-pointer ${
+                          raceCategory === o.val ? "bg-blue-50 border-blue-600 text-blue-900 shadow-sm" : "bg-white border-zinc-200/80 hover:border-zinc-300 text-zinc-600"
+                        }`}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
                   </div>
-                  {experienceLevel === x.val && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
-                </button>
+                </div>
               ))}
-            </div>
+            </>
+          )}
 
+          {stepKey === "experiencia" && (
+            <div className="space-y-5">
+              <p className="text-xs text-zinc-500 font-medium leading-relaxed">
+                Cuéntanos tu nivel actual. El motor calibra la carga inicial según tu experiencia real, no solo los años entrenando.
+              </p>
+              <ThreeTierSelector
+                label="Experiencia en HYROX"
+                value={experienceLevel}
+                onChange={setExperienceLevel}
+                options={[
+                  { val: HyroxExperienceLevel.PRINCIPIANTE, label: "Principiante" },
+                  { val: HyroxExperienceLevel.INTERMEDIO, label: "Intermedio" },
+                  { val: HyroxExperienceLevel.AVANZADO, label: "Avanzado" }
+                ]}
+              />
+              <ThreeTierSelector
+                label="Experiencia en running"
+                value={runningExperience}
+                onChange={setRunningExperience}
+                options={[
+                  { val: HyroxExperienceLevel.PRINCIPIANTE, label: "Principiante" },
+                  { val: HyroxExperienceLevel.INTERMEDIO, label: "Intermedio" },
+                  { val: HyroxExperienceLevel.AVANZADO, label: "Avanzado" }
+                ]}
+              />
+              <ThreeTierSelector
+                label="Experiencia en fuerza"
+                value={strengthExperience}
+                onChange={setStrengthExperience}
+                options={[
+                  { val: HyroxExperienceLevel.PRINCIPIANTE, label: "Principiante" },
+                  { val: HyroxExperienceLevel.INTERMEDIO, label: "Intermedio" },
+                  { val: HyroxExperienceLevel.AVANZADO, label: "Avanzado" }
+                ]}
+              />
+              <ThreeTierSelector
+                label="Nivel de actividad diaria"
+                value={dailyActivityLevel}
+                onChange={setDailyActivityLevel}
+                options={[
+                  { val: "sedentario", label: "Sedentario" },
+                  { val: "moderado", label: "Moderado" },
+                  { val: "activo", label: "Activo" }
+                ]}
+              />
+            </div>
+          )}
+
+          {stepKey === "fecha" && (
             <div className="bg-white p-4 rounded-2xl border border-zinc-200/80 space-y-2 shadow-sm">
               <label className="text-xs font-bold uppercase tracking-wider text-zinc-700 flex items-center justify-between gap-2">
-                <span>Fecha de tu carrera Hyrox (Opcional)</span>
+                <span>Fecha de tu carrera Hyrox {objective === HyroxObjective.POCO_TIEMPO ? "" : "(Opcional)"}</span>
                 <span className="text-[9px] bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full font-bold border border-blue-100">Recomendado</span>
               </label>
               <input
                 type="text"
                 inputMode="numeric"
                 value={raceDateInput}
-                onChange={(e) => setRaceDateInput(formatEUDateInput(e.target.value))}
+                onChange={e => setRaceDateInput(formatEUDateInput(e.target.value))}
                 placeholder="dd/mm/aaaa"
                 maxLength={10}
                 className="w-full bg-white border border-zinc-200/80 rounded-xl px-4 py-3 text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold font-mono"
               />
               <p className="text-xs text-zinc-500 leading-relaxed font-medium">
-                Si la indicas, calculamos la duración exacta del plan hasta esa fecha. Si no, generamos un bloque estándar de 8 semanas.
+                Calculamos la duración exacta del plan hasta esa fecha, incluyendo la semana de taper. Sin fecha, generamos un bloque estándar de 8 semanas.
               </p>
             </div>
-          </motion.div>
-        )}
+          )}
 
-        {step === 3 && (
-          <motion.div
-            key="step3"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.3 }}
-            className="space-y-6"
-          >
-            <div>
-              <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
-                <Dumbbell className="w-5 h-5 text-blue-600" />
-                {stepLabel(3)}. EQUIPO Y ESTACIONES
-              </h3>
+          {stepKey === "rendimiento" && (
+            <div className="space-y-5">
               <p className="text-xs text-zinc-500 font-medium leading-relaxed">
-                Indica a qué equipamiento tienes acceso y en qué estaciones te sientes más débil.
+                Con tus tiempos reales podemos detectar tu limitante principal comparándolos con la tabla de referencia de tu categoría.
               </p>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 block">Equipamiento disponible en tu gimnasio</label>
-              <div className="flex flex-wrap gap-1.5">
-                {HYROX_STATIONS_ORDER.filter(s => s !== "run").map(station => {
-                  const isSel = equipmentAccess.includes(station);
-                  return (
-                    <button
-                      key={station}
-                      type="button"
-                      onClick={() => toggleStationInList(equipmentAccess, setEquipmentAccess, station)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider border cursor-pointer transition ${
-                        isSel ? "bg-blue-600 text-white border-blue-600" : "bg-zinc-100 border-zinc-200 text-zinc-600 hover:bg-zinc-200"
-                      }`}
-                    >
-                      {STATION_LABELS[station]}
-                    </button>
-                  );
-                })}
+              <TimeInput label="Tiempo total Hyrox" value={totalTime} onChange={setTotalTime} placeholder="hh:mm:ss" />
+              <div className="space-y-2">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 block">Splits de carrera (8 x 1 km)</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {runSplits.map((s, i) => (
+                    <input
+                      key={i}
+                      type="text"
+                      value={s}
+                      onChange={e => setRunSplits(prev => prev.map((v, idx) => (idx === i ? e.target.value : v)))}
+                      placeholder={`km${i + 1}`}
+                      className="w-full bg-white border border-zinc-200/80 rounded-xl px-2 py-2 text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold font-mono text-xs text-center"
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-
-            <div className="bg-white p-4 rounded-2xl border border-zinc-200/80 space-y-3 shadow-sm">
-              <label className="text-xs font-bold uppercase tracking-wider text-zinc-700 block">
-                ¿En qué estaciones te sientes más débil?
-              </label>
-              <p className="text-[11px] text-zinc-500 font-medium leading-normal">
-                El motor priorizará entrenamientos que trabajen estas estaciones para nivelar tu rendimiento.
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {HYROX_STATIONS_ORDER.map(station => {
-                  const isSel = weakStations.includes(station);
-                  return (
-                    <button
-                      key={station}
-                      type="button"
-                      onClick={() => toggleStationInList(weakStations, setWeakStations, station)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider border cursor-pointer transition ${
-                        isSel ? "bg-rose-500 text-white border-rose-500" : "bg-zinc-100 border-zinc-200 text-zinc-600 hover:bg-zinc-200"
-                      }`}
-                    >
-                      {STATION_LABELS[station]}
-                    </button>
-                  );
-                })}
+              <div className="grid grid-cols-2 gap-3">
+                <TimeInput label="Ski Erg" value={skiErg} onChange={setSkiErg} />
+                <TimeInput label="Sled Push" value={sledPush} onChange={setSledPush} />
+                <TimeInput label="Sled Pull" value={sledPull} onChange={setSledPull} />
+                <TimeInput label="Burpee Broad Jump" value={burpeeBroadJump} onChange={setBurpeeBroadJump} />
+                <TimeInput label="Row" value={row} onChange={setRow} />
+                <TimeInput label="Farmers Carry" value={farmersCarry} onChange={setFarmersCarry} />
+                <TimeInput label="Sandbag Lunges" value={sandbagLunges} onChange={setSandbagLunges} />
+                <TimeInput label="Wall Balls" value={wallBalls} onChange={setWallBalls} />
               </div>
+              <TimeInput label="Tiempo total de transiciones (Roxzone)" value={roxzoneTotal} onChange={setRoxzoneTotal} />
             </div>
-          </motion.div>
-        )}
+          )}
 
-        {step === 4 && (
-          <motion.div
-            key="step4"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.3 }}
-            className="space-y-6"
-          >
-            <div>
-              <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
-                <ShieldAlert className="w-5 h-5 text-blue-600" />
-                {stepLabel(4)}. FRECUENCIA Y LESIONES
-              </h3>
-              <p className="text-xs uppercase tracking-wider text-zinc-500 font-bold">
-                Ajustemos la frecuencia semanal e historial de molestias para evitar lesiones en tu plan.
+          {stepKey === "camino" && (
+            <div className="space-y-5">
+              {objective === HyroxObjective.MEJORAR_ESTACIONES && (
+                <>
+                  <p className="text-xs text-zinc-500 font-medium leading-relaxed">¿Qué tipo de dificultad notas más en las estaciones?</p>
+                  <div className="space-y-2.5">
+                    {[
+                      { val: "fuerza_maxima" as HyroxLimitantType, label: "Fuerza", desc: "Sled Push/Pull o Farmers Carry se me hacen muy pesados." },
+                      { val: "fuerza_resistencia" as HyroxLimitantType, label: "Resistencia muscular", desc: "Puedo hacer la estación, pero no repetir el esfuerzo (Wall Balls, Burpees)." },
+                      { val: "tecnica" as HyroxLimitantType, label: "Técnica", desc: "Pierdo eficiencia por la forma de ejecutar el movimiento." }
+                    ].map(o => (
+                      <button
+                        key={o.val}
+                        type="button"
+                        onClick={() => setEstacionesTipo(o.val)}
+                        className={`w-full px-4 py-3.5 rounded-xl border text-left transition cursor-pointer flex justify-between items-center gap-3 ${
+                          estacionesTipo === o.val ? "bg-blue-50 border-blue-600 text-blue-900" : "bg-white border-zinc-200/80 text-zinc-700 hover:border-zinc-300"
+                        }`}
+                      >
+                        <div>
+                          <span className="text-xs font-black uppercase tracking-wider block">{o.label}</span>
+                          <span className="text-[11px] text-zinc-500 font-medium leading-relaxed">{o.desc}</span>
+                        </div>
+                        {estacionesTipo === o.val && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 block">¿Qué estaciones concretas te cuestan más?</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {HYROX_STATIONS_ORDER.filter(s => s !== "run").map(station => {
+                        const isSel = weakStationsSelfReported.includes(station);
+                        return (
+                          <button
+                            key={station}
+                            type="button"
+                            onClick={() => toggleWeakStation(station)}
+                            className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider border cursor-pointer transition ${
+                              isSel ? "bg-rose-500 text-white border-rose-500" : "bg-zinc-100 border-zinc-200 text-zinc-600 hover:bg-zinc-200"
+                            }`}
+                          >
+                            {STATION_LABELS[station]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {objective === HyroxObjective.MEJORAR_RESISTENCIA && (
+                <>
+                  <p className="text-xs text-zinc-500 font-medium leading-relaxed">¿Dónde notas más que te falta resistencia?</p>
+                  <div className="space-y-2.5">
+                    {[
+                      { val: "carrera" as HyroxLimitantType, label: "En la carrera", desc: "El ritmo de carrera cae claramente a medida que avanza la prueba." },
+                      { val: "fuerza_resistencia" as HyroxLimitantType, label: "En las estaciones", desc: "Aguanto bien corriendo, pero las estaciones me dejan sin fuerzas." }
+                    ].map(o => (
+                      <button
+                        key={o.val}
+                        type="button"
+                        onClick={() => setResistenciaTipo(o.val)}
+                        className={`w-full px-4 py-3.5 rounded-xl border text-left transition cursor-pointer flex justify-between items-center gap-3 ${
+                          resistenciaTipo === o.val ? "bg-blue-50 border-blue-600 text-blue-900" : "bg-white border-zinc-200/80 text-zinc-700 hover:border-zinc-300"
+                        }`}
+                      >
+                        <div>
+                          <span className="text-xs font-black uppercase tracking-wider block">{o.label}</span>
+                          <span className="text-[11px] text-zinc-500 font-medium leading-relaxed">{o.desc}</span>
+                        </div>
+                        {resistenciaTipo === o.val && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {objective === HyroxObjective.DOBLES && (
+                <>
+                  <p className="text-xs text-zinc-500 font-medium leading-relaxed">¿Cuál será tu rol dentro del equipo de dobles?</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { val: "carrera" as const, label: "Más carrera" },
+                      { val: "fuerza" as const, label: "Más fuerza" },
+                      { val: "equilibrado" as const, label: "Equilibrado" }
+                    ].map(o => (
+                      <button
+                        key={o.val}
+                        type="button"
+                        onClick={() => setDoublesRole(o.val)}
+                        className={`py-3 text-center rounded-xl border font-bold uppercase tracking-wider text-xs transition cursor-pointer ${
+                          doublesRole === o.val ? "bg-blue-50 border-blue-600 text-blue-900 shadow-sm" : "bg-white border-zinc-200/80 hover:border-zinc-300 text-zinc-600"
+                        }`}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {objective === HyroxObjective.VOLVER_PAUSA && (
+                <>
+                  <p className="text-xs text-zinc-500 font-medium leading-relaxed">¿Cuánto tiempo llevas sin entrenar de forma regular?</p>
+                  <div className="grid grid-cols-1 gap-2">
+                    {[
+                      { val: "menos_1_mes" as const, label: "Menos de 1 mes" },
+                      { val: "1_3_meses" as const, label: "Entre 1 y 3 meses" },
+                      { val: "mas_3_meses" as const, label: "Más de 3 meses" }
+                    ].map(o => (
+                      <button
+                        key={o.val}
+                        type="button"
+                        onClick={() => setBreakDuration(o.val)}
+                        className={`py-3 px-4 text-left rounded-xl border font-bold uppercase tracking-wider text-xs transition cursor-pointer ${
+                          breakDuration === o.val ? "bg-blue-50 border-blue-600 text-blue-900 shadow-sm" : "bg-white border-zinc-200/80 hover:border-zinc-300 text-zinc-600"
+                        }`}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {stepKey === "gimnasio" && (
+            <div className="space-y-3">
+              <p className="text-xs text-zinc-500 font-medium leading-relaxed">
+                Si tu gimnasio no tiene equipamiento oficial de Hyrox, adaptamos automáticamente cada ejercicio por su sustituto más parecido.
               </p>
+              {[
+                { val: "especializado" as HyroxGymType, label: "Gimnasio especializado Hyrox", desc: "Tengo acceso a trineo, Ski Erg, Wall Balls, Row, Farmers, Sandbag..." },
+                { val: "convencional" as HyroxGymType, label: "Gimnasio convencional", desc: "Gimnasio normal, sin estaciones oficiales de Hyrox." }
+              ].map(o => (
+                <button
+                  key={o.val}
+                  type="button"
+                  onClick={() => setGymType(o.val)}
+                  className={`w-full px-4 py-3.5 rounded-xl border text-left transition cursor-pointer flex justify-between items-center gap-3 ${
+                    gymType === o.val ? "bg-blue-50 border-blue-600 text-blue-900" : "bg-white border-zinc-200/80 text-zinc-700 hover:border-zinc-300"
+                  }`}
+                >
+                  <div>
+                    <span className="text-xs font-black uppercase tracking-wider block">{o.label}</span>
+                    <span className="text-[11px] text-zinc-500 font-medium leading-relaxed">{o.desc}</span>
+                  </div>
+                  {gymType === o.val && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
+                </button>
+              ))}
             </div>
+          )}
 
+          {stepKey === "frecuencia_lesiones" && (
             <div className="space-y-5">
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 block">Frecuencia Semanal de Entrenamiento</label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                   {[
                     { val: HyroxFrequencyOption.FREQ_2, label: "2 días" },
                     { val: HyroxFrequencyOption.FREQ_3, label: "3 días" },
                     { val: HyroxFrequencyOption.FREQ_4, label: "4 días" },
-                    { val: HyroxFrequencyOption.FREQ_5, label: "5 días" }
+                    { val: HyroxFrequencyOption.FREQ_5, label: "5 días" },
+                    { val: HyroxFrequencyOption.FREQ_6, label: "6 días" }
                   ].map(f => (
                     <button
                       key={f.val}
@@ -380,9 +657,29 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
                     </button>
                   ))}
                 </div>
-                <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">
-                  Repartimos automáticamente carrera, fuerza, acondicionamiento y simulación entre los días elegidos.
-                </p>
+                {frequency === HyroxFrequencyOption.FREQ_6 && (
+                  <p className="text-[11px] text-amber-600 leading-relaxed font-bold">
+                    6 días/semana solo se recomienda con buena recuperación, alta adherencia y experiencia suficiente.
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 block">Duración máxima por sesión</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[45, 60, 90].map(min => (
+                    <button
+                      key={min}
+                      type="button"
+                      onClick={() => setSessionDurationMin(min as HyroxSessionDurationMin)}
+                      className={`py-3 text-center rounded-xl border font-black uppercase tracking-wider text-xs transition cursor-pointer ${
+                        sessionDurationMin === min ? "bg-blue-50 border-blue-600 text-blue-900 shadow-sm" : "bg-white border-zinc-200/80 hover:border-zinc-300 text-zinc-600"
+                      }`}
+                    >
+                      {min} min
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="bg-white p-4 rounded-2xl border border-zinc-200/80 space-y-3 shadow-sm">
@@ -391,18 +688,29 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
                     <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-900">¿Tienes alguna lesión o dolor activo?</h4>
                     <p className="text-[11px] text-zinc-500 font-medium leading-normal">Permite modular la intensidad de carga al inicio del plan.</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveInjury(!activeInjury);
-                      if (activeInjury) setInjuryAreas([]);
-                    }}
-                    className={`px-4 py-2 rounded-xl border font-bold uppercase tracking-wider text-[10px] cursor-pointer transition shrink-0 ${
-                      activeInjury ? "bg-rose-50 border-rose-300 text-rose-700" : "bg-zinc-100 border-zinc-200 text-zinc-600 hover:bg-zinc-200"
-                    }`}
-                  >
-                    {activeInjury ? "SÍ, TENGO" : "NO, SANO"}
-                  </button>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveInjury(false);
+                        setInjuryAreas([]);
+                      }}
+                      className={`px-4 py-2 rounded-xl border font-bold uppercase tracking-wider text-[10px] cursor-pointer transition ${
+                        !activeInjury ? "bg-black border-black text-white" : "bg-zinc-100 border-zinc-200 text-zinc-500 hover:bg-zinc-200"
+                      }`}
+                    >
+                      No
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveInjury(true)}
+                      className={`px-4 py-2 rounded-xl border font-bold uppercase tracking-wider text-[10px] cursor-pointer transition ${
+                        activeInjury ? "bg-rose-600 border-rose-600 text-white" : "bg-zinc-100 border-zinc-200 text-zinc-500 hover:bg-zinc-200"
+                      }`}
+                    >
+                      Sí
+                    </button>
+                  </div>
                 </div>
 
                 {activeInjury && (
@@ -428,89 +736,72 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
                     <textarea
                       placeholder="Describe brevemente tus molestias actuales..."
                       value={injuryNotes}
-                      onChange={(e) => setInjuryNotes(e.target.value)}
+                      onChange={e => setInjuryNotes(e.target.value)}
                       className="w-full bg-white border border-zinc-200/80 rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:border-blue-600 transition h-16 resize-none font-medium"
                     />
                   </motion.div>
                 )}
               </div>
             </div>
-          </motion.div>
-        )}
+          )}
 
-        {step === 5 && (
-          <motion.div
-            key="step5"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.3 }}
-            className="space-y-6"
-          >
-            <div>
-              <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
-                <User className="w-5 h-5 text-blue-600" />
-                {stepLabel(5)}. PERFIL FISIOLÓGICO
-              </h3>
+          {stepKey === "perfil" && (
+            <div className="space-y-6">
               <p className="text-xs text-zinc-500 font-medium leading-relaxed">
                 Conocer tu perfil nos permite calibrar cargas de fuerza, máquinas y carrera a tu nivel real.
               </p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-2">
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 block">Edad (Años)</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={age}
-                  onChange={(e) => setAge(cleanNumericInput(e.target.value))}
-                  className="w-full bg-white border border-zinc-200/80 rounded-xl px-4 py-3 text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 block">Sexo Biológico</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(["M", "F"] as const).map(s => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setSex(s)}
-                      className={`py-3 text-center rounded-xl border font-black uppercase tracking-wider text-xs transition cursor-pointer ${
-                        sex === s ? "bg-black border-black text-white" : "bg-white border-zinc-200/80 hover:border-zinc-300 text-zinc-600"
-                      }`}
-                    >
-                      {s === "M" ? "Masc" : "Fem"}
-                    </button>
-                  ))}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 block">Edad (Años)</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={age}
+                    onChange={e => setAge(cleanNumericInput(e.target.value))}
+                    className="w-full bg-white border border-zinc-200/80 rounded-xl px-4 py-3 text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 block">Sexo Biológico</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["M", "F"] as const).map(s => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setSex(s)}
+                        className={`py-3 text-center rounded-xl border font-black uppercase tracking-wider text-xs transition cursor-pointer ${
+                          sex === s ? "bg-black border-black text-white" : "bg-white border-zinc-200/80 hover:border-zinc-300 text-zinc-600"
+                        }`}
+                      >
+                        {s === "M" ? "Masc" : "Fem"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 block">Altura (cm)</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={height}
+                    onChange={e => setHeight(cleanNumericInput(e.target.value))}
+                    className="w-full bg-white border border-zinc-200/80 rounded-xl px-4 py-3 text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 block">Peso (kg)</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={weight}
+                    onChange={e => setWeight(cleanNumericInput(e.target.value))}
+                    className="w-full bg-white border border-zinc-200/80 rounded-xl px-4 py-3 text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold"
+                  />
                 </div>
               </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 block">Altura (cm)</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={height}
-                  onChange={(e) => setHeight(cleanNumericInput(e.target.value))}
-                  className="w-full bg-white border border-zinc-200/80 rounded-xl px-4 py-3 text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 block">Peso (kg)</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={weight}
-                  onChange={(e) => setWeight(cleanNumericInput(e.target.value))}
-                  className="w-full bg-white border border-zinc-200/80 rounded-xl px-4 py-3 text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold"
-                />
-              </div>
             </div>
-          </motion.div>
-        )}
+          )}
+        </motion.div>
       </AnimatePresence>
 
       <div className="flex items-center justify-between mt-10 pt-6 border-t border-zinc-200/80">
@@ -526,7 +817,7 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
           onClick={handleNext}
           className="px-6 py-3 rounded-xl bg-black hover:bg-zinc-800 text-white font-extrabold uppercase tracking-widest text-xs transition flex items-center gap-1.5 cursor-pointer shadow-md"
         >
-          {step === 5 ? "Generar Plan" : "Continuar"}
+          {stepIdx === steps.length - 1 ? "Generar Plan" : "Continuar"}
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>

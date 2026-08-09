@@ -1,14 +1,62 @@
 export enum HyroxObjective {
-  PRIMERA_CARRERA = "primera_carrera", // Preparar mi primera carrera Hyrox
-  MEJORAR_TIEMPO = "mejorar_tiempo",   // Ya he competido, quiero bajar mi tiempo
-  BASE_GENERAL = "base_general"        // Base de fuerza + acondicionamiento funcional, sin carrera fijada
+  PRIMERA_CARRERA = "primera_carrera",                       // Preparar mi primer HYROX
+  MEJORAR_MARCA = "mejorar_marca",                           // Mejorar mi marca en HYROX
+  CATEGORIA_CONCRETA = "categoria_concreta",                 // Preparar una categoría concreta
+  MEJORAR_CARRERA_ESTACIONES = "mejorar_carrera_estaciones", // Mejorar la carrera entre estaciones
+  MEJORAR_ESTACIONES = "mejorar_estaciones",                 // Mejorar las estaciones funcionales
+  MEJORAR_TRANSICIONES = "mejorar_transiciones",             // Mejorar las transiciones
+  DOBLES = "dobles",                                         // Competir en modalidad Dobles
+  MEJORAR_RESISTENCIA = "mejorar_resistencia",               // Mejorar la resistencia general
+  VOLVER_PAUSA = "volver_pausa",                             // Volver a entrenar después de una pausa
+  POCO_TIEMPO = "poco_tiempo",                               // Preparar competición próxima con poco tiempo
+  BASE_GENERAL = "base_general"                              // Sin carrera objetivo (fuera del cerebro Hyrox)
 }
+
+// Objetivos del cerebro que asumen que el atleta ya ha competido en Hyrox al menos una vez.
+export const HYROX_OBJECTIVES_ASSUMING_RACE_EXPERIENCE: HyroxObjective[] = [
+  HyroxObjective.MEJORAR_MARCA,
+  HyroxObjective.CATEGORIA_CONCRETA,
+  HyroxObjective.MEJORAR_CARRERA_ESTACIONES,
+  HyroxObjective.MEJORAR_ESTACIONES,
+  HyroxObjective.MEJORAR_TRANSICIONES,
+  HyroxObjective.MEJORAR_RESISTENCIA,
+  HyroxObjective.VOLVER_PAUSA
+];
+
+// Único objetivo que recoge la tabla completa de rendimiento (tiempo total + 8 splits + tiempos por estación).
+export const HYROX_OBJECTIVE_WITH_FULL_PERFORMANCE_DATA = HyroxObjective.MEJORAR_MARCA;
 
 export enum HyroxDivision {
   OPEN = "open",
   PRO = "pro",
   DOUBLES = "doubles"
 }
+
+// Categoría oficial de competición: determina qué fila de HYROX_BENCHMARKS / HYROX_DEBUTANTE_RANGE se usa.
+export type HyroxRaceCategory =
+  | "open_masculina"
+  | "open_femenina"
+  | "pro_masculina"
+  | "pro_femenina"
+  | "dobles_masculina_open"
+  | "dobles_femenina_open"
+  | "dobles_masculina_pro"
+  | "dobles_femenina_pro"
+  | "dobles_mixtos";
+
+export type HyroxBenchmarkBand = "sub60" | "sub65" | "sub70" | "sub75" | "sub80" | "sub85" | "sub90";
+
+export type HyroxStationParcial =
+  | "run1km"
+  | "skiErg"
+  | "sledPush"
+  | "sledPull"
+  | "burpeeBroadJump"
+  | "row"
+  | "farmersCarry"
+  | "sandbagLunges"
+  | "wallBalls"
+  | "roxzoneTotal";
 
 export enum HyroxExperienceLevel {
   PRINCIPIANTE = "principiante", // Nunca he entrenado funcional/crossfit
@@ -20,8 +68,14 @@ export enum HyroxFrequencyOption {
   FREQ_2 = "2",
   FREQ_3 = "3",
   FREQ_4 = "4",
-  FREQ_5 = "5"
+  FREQ_5 = "5",
+  FREQ_6 = "6"
 }
+
+export type HyroxSessionDurationMin = 45 | 60 | 90;
+
+// Tipo de gimnasio: determina si se usan las estaciones oficiales o la tabla de sustituciones del cerebro.
+export type HyroxGymType = "especializado" | "convencional";
 
 export type HyroxStation =
   | "run"
@@ -35,6 +89,15 @@ export type HyroxStation =
   | "wall_balls"
   | "bike_erg"
   | "general";
+
+// Limitante principal según el análisis del cerebro (Parte 1, Paso "Análisis de limitantes").
+export type HyroxLimitantType =
+  | "carrera"
+  | "fuerza_maxima"
+  | "fuerza_resistencia"
+  | "transiciones"
+  | "tecnica"
+  | "recuperacion";
 
 export type HyroxCategory = "carrera" | "fuerza" | "acondicionamiento" | "simulacion";
 
@@ -69,6 +132,22 @@ export interface HyroxWorkoutTemplate {
   equipment: HyroxStation[];
   targetStations: HyroxStation[]; // stations this workout mainly trains
   blocks: HyroxBlock[];
+  source?: "static" | "gemini"; // de dónde vino el contenido de la sesión
+}
+
+// Tiempos oficiales de competición cuando el objetivo es "Mejorar mi marca en HYROX".
+export interface HyroxPerformanceData {
+  totalTime: string;              // tiempo total Hyrox, hh:mm:ss o mm:ss
+  runSplits: string[];            // los 8 splits de 1 km, mm:ss cada uno
+  skiErg: string;
+  sledPush: string;
+  sledPull: string;
+  burpeeBroadJump: string;
+  row: string;
+  farmersCarry: string;
+  sandbagLunges: string;
+  wallBalls: string;
+  roxzoneTotal: string;           // tiempo total de transiciones
 }
 
 export interface HyroxOnboardingData {
@@ -76,13 +155,29 @@ export interface HyroxOnboardingData {
   sex: "M" | "F" | "Otro";
   height: number; // cm
   weight: number; // kg
+
   objective: HyroxObjective;
+  raceCategory: HyroxRaceCategory;
   division: HyroxDivision;
   experienceLevel: HyroxExperienceLevel;
+  runningExperience: HyroxExperienceLevel;
+  strengthExperience: HyroxExperienceLevel;
+  dailyActivityLevel: "sedentario" | "moderado" | "activo";
   raceDate?: string; // ISO date
+
+  gymType: HyroxGymType;
   frequency: HyroxFrequencyOption;
-  equipmentAccess: HyroxStation[];
-  weakStations: HyroxStation[];
+  sessionDurationMin: HyroxSessionDurationMin;
+
+  // Solo si objective === MEJORAR_MARCA
+  performance?: HyroxPerformanceData;
+
+  // "Camino" cualitativo para el resto de objetivos (sin pedir splits): cada objetivo usa el subconjunto que le aplica.
+  selfReportedLimitant?: HyroxLimitantType;
+  weakStationsSelfReported?: HyroxStation[];
+  doublesRole?: "carrera" | "fuerza" | "equilibrado";
+  breakDuration?: "menos_1_mes" | "1_3_meses" | "mas_3_meses";
+
   activeInjury: boolean;
   injuryAreas: string[];
   injuryNotes?: string;
@@ -117,6 +212,7 @@ export interface HyroxTrainingPlan {
   initialDiagnostic: {
     levelEstimated: "Principiante" | "Intermedio" | "Avanzado";
     mainLimitant: string;
+    limitantType?: HyroxLimitantType;
     strengths: string[];
     weaknesses: string[];
     bmi: number;

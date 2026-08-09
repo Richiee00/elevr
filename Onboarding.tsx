@@ -451,20 +451,29 @@ export default function Onboarding({ onComplete, onCancel, stepOffset = 0 }: Onb
                       Permite modular la intensidad de carga al inicio del plan.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveInjury(!activeInjury);
-                      if (activeInjury) setInjuryAreas([]);
-                    }}
-                    className={`px-4 py-2 rounded-xl border font-bold uppercase tracking-wider text-[10px] cursor-pointer transition shrink-0 ${
-                      activeInjury
-                        ? "bg-rose-50 border-rose-300 text-rose-700"
-                        : "bg-zinc-100 border-zinc-200 text-zinc-600 hover:bg-zinc-200"
-                    }`}
-                  >
-                    {activeInjury ? "SÍ, TENGO" : "NO, SANO"}
-                  </button>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveInjury(false);
+                        setInjuryAreas([]);
+                      }}
+                      className={`px-4 py-2 rounded-xl border font-bold uppercase tracking-wider text-[10px] cursor-pointer transition ${
+                        !activeInjury ? "bg-black border-black text-white" : "bg-zinc-100 border-zinc-200 text-zinc-500 hover:bg-zinc-200"
+                      }`}
+                    >
+                      No
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveInjury(true)}
+                      className={`px-4 py-2 rounded-xl border font-bold uppercase tracking-wider text-[10px] cursor-pointer transition ${
+                        activeInjury ? "bg-rose-600 border-rose-600 text-white" : "bg-zinc-100 border-zinc-200 text-zinc-500 hover:bg-zinc-200"
+                      }`}
+                    >
+                      Sí
+                    </button>
+                  </div>
                 </div>
 
                 {activeInjury && (

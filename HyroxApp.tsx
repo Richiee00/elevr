@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { HyroxOnboardingData, HyroxTrainingPlan } from "./hyroxTypes";
-import { DailyReadinessInput } from "./types";
-import { generateHyroxPlan } from "./hyroxEngine";
+import { HyroxDailyInput, generateHyroxPlan } from "./hyroxEngine";
 
 import HyroxLanding from "./HyroxLanding";
 import HyroxOnboarding from "./HyroxOnboarding";
@@ -24,7 +23,7 @@ export default function HyroxApp({ onSwitchApp }: HyroxAppProps) {
   const [onboarding, setOnboarding] = useState<HyroxOnboardingData | null>(null);
   const [plan, setPlan] = useState<HyroxTrainingPlan | null>(null);
   const [currentWeekIndex, setCurrentWeekIndex] = useState<number>(0);
-  const [readinessHistory, setReadinessHistory] = useState<Record<string, DailyReadinessInput>>({});
+  const [readinessHistory, setReadinessHistory] = useState<Record<string, HyroxDailyInput>>({});
   const [completedWorkouts, setCompletedWorkouts] = useState<Record<string, { feedback: string; rpe: number; date: string }>>({});
 
   useEffect(() => {
@@ -80,7 +79,7 @@ export default function HyroxApp({ onSwitchApp }: HyroxAppProps) {
     localStorage.setItem("hyrox_plan_data", JSON.stringify(newPlan));
   };
 
-  const handleSaveReadiness = (input: DailyReadinessInput) => {
+  const handleSaveReadiness = (input: HyroxDailyInput) => {
     const todayKey = new Date().toISOString().split("T")[0];
     const newHistory = { ...readinessHistory, [todayKey]: input };
     setReadinessHistory(newHistory);
@@ -191,6 +190,7 @@ export default function HyroxApp({ onSwitchApp }: HyroxAppProps) {
             <motion.div key="today" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
               <HyroxTodayWorkoutView
                 plan={plan}
+                onboarding={onboarding}
                 currentWeekIndex={currentWeekIndex}
                 readiness={todayReadiness}
                 onSaveReadiness={handleSaveReadiness}

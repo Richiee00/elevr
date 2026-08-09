@@ -1,18 +1,18 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
-import { HyroxTrainingPlan } from "./hyroxTypes";
-import { DailyReadinessInput } from "./types";
-import { getTemplateById, CATEGORY_LABELS } from "./hyroxLibrary";
-import { adaptHyroxSession } from "./hyroxEngine";
+import { HyroxOnboardingData, HyroxTrainingPlan } from "./hyroxTypes";
+import { HyroxDailyInput, adaptHyroxSession, generateHyroxSessionContent, getCachedGeneratedSession, resolveHyroxSessionTemplate } from "./hyroxEngine";
+import { CATEGORY_LABELS } from "./hyroxLibrary";
 import HyroxWorkoutDetail from "./HyroxWorkoutDetail";
 import HyroxReadinessCard from "./HyroxReadinessCard";
 import { Moon, Flame, BrainCircuit, ChevronDown, ChevronUp } from "lucide-react";
 
 interface HyroxTodayWorkoutViewProps {
   plan: HyroxTrainingPlan;
+  onboarding: HyroxOnboardingData | null;
   currentWeekIndex: number;
-  readiness?: DailyReadinessInput;
-  onSaveReadiness: (input: DailyReadinessInput) => void;
+  readiness?: HyroxDailyInput;
+  onSaveReadiness: (input: HyroxDailyInput) => void;
   onLogWorkoutCompletion: (sessionId: string, feedback: string, rpe: number) => void;
   completedWorkouts: Record<string, { feedback: string; rpe: number; date: string }>;
 }
@@ -21,6 +21,7 @@ const DAY_NAMES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábad
 
 export default function HyroxTodayWorkoutView({
   plan,
+  onboarding,
   currentWeekIndex,
   readiness,
   onSaveReadiness,
@@ -28,6 +29,7 @@ export default function HyroxTodayWorkoutView({
   completedWorkouts
 }: HyroxTodayWorkoutViewProps) {
   const [showReadiness, setShowReadiness] = useState(false);
+  const [generatedVersion, setGeneratedVersion] = useState(0);
 
   const localDay = new Date().getDay();
   const dayIndex = localDay === 0 ? 6 : localDay - 1;
@@ -39,7 +41,35 @@ export default function HyroxTodayWorkoutView({
   const loggedFeedback = completedWorkouts[todaySession.id];
   const adaptation = adaptHyroxSession(readiness);
 
-  const template = todaySession.templateId ? getTemplateById(todaySession.templateId) : undefined;
+  useEffect(() => {
+    if (!onboarding || !todaySession.templateId || todaySession.category === "descanso") return;
+    if (getCachedGeneratedSession(todaySession.id)) return;
+
+    let cancelled = false;
+    generateHyroxSessionContent(todaySession.id, {
+      category: todaySession.category as "carrera" | "fuerza" | "acondicionamiento" | "simulacion",
+      objective: onboarding.objective,
+      limitantType: plan.initialDiagnostic.limitantType,
+      experienceLevel: onboarding.experienceLevel,
+      gymType: onboarding.gymType,
+      sessionDurationMin: onboarding.sessionDurationMin,
+      isDescarga: activeWeek.isDescarga,
+      injuryAreas: onboarding.activeInjury ? onboarding.injuryAreas : [],
+      weekNumber: activeWeek.weekNumber,
+      durationWeeks: plan.durationWeeks
+    }).then(result => {
+      if (!cancelled && result) setGeneratedVersion(v => v + 1);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todaySession.id]);
+
+  const template = resolveHyroxSessionTemplate(todaySession);
+  // generatedVersion se referencia únicamente para forzar el re-render cuando Gemini termina de generar.
+  void generatedVersion;
 
   return (
     <div className="space-y-5">

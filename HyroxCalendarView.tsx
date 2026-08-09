@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { HyroxTrainingPlan, HyroxCategory } from "./hyroxTypes";
-import { getTemplateById, CATEGORY_LABELS } from "./hyroxLibrary";
+import { CATEGORY_LABELS } from "./hyroxLibrary";
+import { resolveHyroxSessionTemplate } from "./hyroxEngine";
 import { formatDateEU } from "./engines";
 import { ChevronLeft, ChevronRight, CalendarCheck2, CheckCircle2 } from "lucide-react";
 
@@ -71,7 +72,7 @@ export default function HyroxCalendarView({ plan, completedWorkouts }: HyroxCale
   }, [currentDate]);
 
   const selectedSession = selectedDayStr ? getSessionForDate(new Date(selectedDayStr)) : null;
-  const selectedTemplate = selectedSession?.templateId ? getTemplateById(selectedSession.templateId) : undefined;
+  const selectedTemplate = selectedSession ? resolveHyroxSessionTemplate(selectedSession) : undefined;
   const selectedCompleted = selectedSession ? completedWorkouts[selectedSession.id] : undefined;
 
   return (

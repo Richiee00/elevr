@@ -53,8 +53,24 @@ export default function HyroxProfileView({ onboarding, plan, onUpdateProfile, co
     switch (obj) {
       case HyroxObjective.PRIMERA_CARRERA:
         return "Mi Primera Carrera Hyrox";
-      case HyroxObjective.MEJORAR_TIEMPO:
-        return "Mejorar Mi Tiempo Hyrox";
+      case HyroxObjective.MEJORAR_MARCA:
+        return "Mejorar Mi Marca en Hyrox";
+      case HyroxObjective.CATEGORIA_CONCRETA:
+        return "Preparar Mi Categoría";
+      case HyroxObjective.MEJORAR_CARRERA_ESTACIONES:
+        return "Mejorar la Carrera entre Estaciones";
+      case HyroxObjective.MEJORAR_ESTACIONES:
+        return "Mejorar las Estaciones Funcionales";
+      case HyroxObjective.MEJORAR_TRANSICIONES:
+        return "Mejorar las Transiciones";
+      case HyroxObjective.DOBLES:
+        return "Preparar Modalidad Dobles";
+      case HyroxObjective.MEJORAR_RESISTENCIA:
+        return "Mejorar Mi Resistencia General";
+      case HyroxObjective.VOLVER_PAUSA:
+        return "Volver a Entrenar tras una Pausa";
+      case HyroxObjective.POCO_TIEMPO:
+        return "Preparación Exprés de Competición";
       case HyroxObjective.BASE_GENERAL:
         return "Base de Fuerza y Acondicionamiento";
       default:
@@ -230,11 +246,11 @@ export default function HyroxProfileView({ onboarding, plan, onUpdateProfile, co
             )}
           </div>
 
-          {onboarding.weakStations.length > 0 && (
+          {(onboarding.weakStationsSelfReported?.length ?? 0) > 0 && (
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">Estaciones a mejorar</p>
               <div className="flex flex-wrap gap-1.5">
-                {onboarding.weakStations.map(s => (
+                {onboarding.weakStationsSelfReported!.map(s => (
                   <span key={s} className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 text-xs font-bold border border-rose-200">
                     {STATION_LABELS[s]}
                   </span>

@@ -1,9 +1,8 @@
 import React, { useState } from "react";
 import { motion } from "motion/react";
 import { HyroxTrainingPlan, HyroxCategory, HyroxWorkoutSession } from "./hyroxTypes";
-import { DailyReadinessInput } from "./types";
-import { getTemplateById, CATEGORY_LABELS } from "./hyroxLibrary";
-import { adaptHyroxSession } from "./hyroxEngine";
+import { HyroxDailyInput, adaptHyroxSession, resolveHyroxSessionTemplate } from "./hyroxEngine";
+import { CATEGORY_LABELS } from "./hyroxLibrary";
 import HyroxWorkoutCard from "./HyroxWorkoutCard";
 import HyroxWorkoutDetail from "./HyroxWorkoutDetail";
 import HyroxReadinessCard from "./HyroxReadinessCard";
@@ -15,8 +14,8 @@ interface HyroxWeeklyPlanViewProps {
   onSetCurrentWeek: (idx: number) => void;
   onLogWorkoutCompletion: (sessionId: string, feedback: string, rpe: number) => void;
   completedWorkouts: Record<string, { feedback: string; rpe: number; date: string }>;
-  readiness?: DailyReadinessInput;
-  onSaveReadiness?: (input: DailyReadinessInput) => void;
+  readiness?: HyroxDailyInput;
+  onSaveReadiness?: (input: HyroxDailyInput) => void;
 }
 
 const DAY_NAMES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
@@ -173,7 +172,7 @@ export default function HyroxWeeklyPlanView({
             );
           }
 
-          const template = session.templateId ? getTemplateById(session.templateId) : undefined;
+          const template = resolveHyroxSessionTemplate(session);
           if (!template) return null;
 
           return (

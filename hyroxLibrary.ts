@@ -1,4 +1,4 @@
-import { HyroxCategory, HyroxStation, HyroxWorkoutTemplate } from "./hyroxTypes";
+import { HyroxCategory, HyroxStation, HyroxStationParcial, HyroxWorkoutTemplate } from "./hyroxTypes";
 
 export const STATION_LABELS: Record<HyroxStation, string> = {
   run: "Run",
@@ -12,6 +12,20 @@ export const STATION_LABELS: Record<HyroxStation, string> = {
   wall_balls: "Wall Balls",
   bike_erg: "Bike Erg",
   general: "Barbell / DB"
+};
+
+// Etiquetas para las claves de HyroxStationParcial (usadas por el análisis de benchmarks, distintas de HyroxStation).
+export const PARCIAL_LABELS: Record<HyroxStationParcial, string> = {
+  run1km: "Carrera (1km)",
+  skiErg: "Ski Erg",
+  sledPush: "Sled Push",
+  sledPull: "Sled Pull",
+  burpeeBroadJump: "Burpee Broad Jump",
+  row: "Row Erg",
+  farmersCarry: "Farmers Carry",
+  sandbagLunges: "Sandbag Lunges",
+  wallBalls: "Wall Balls",
+  roxzoneTotal: "Roxzone / Transiciones"
 };
 
 export const CATEGORY_LABELS: Record<HyroxCategory, string> = {
