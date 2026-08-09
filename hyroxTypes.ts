@@ -1,25 +1,17 @@
 export enum HyroxObjective {
-  PRIMERA_CARRERA = "primera_carrera",                       // Preparar mi primer HYROX
-  MEJORAR_MARCA = "mejorar_marca",                           // Mejorar mi marca en HYROX
-  CATEGORIA_CONCRETA = "categoria_concreta",                 // Preparar una categoría concreta
-  MEJORAR_CARRERA_ESTACIONES = "mejorar_carrera_estaciones", // Mejorar la carrera entre estaciones
-  MEJORAR_ESTACIONES = "mejorar_estaciones",                 // Mejorar las estaciones funcionales
-  MEJORAR_TRANSICIONES = "mejorar_transiciones",             // Mejorar las transiciones
-  DOBLES = "dobles",                                         // Competir en modalidad Dobles
-  MEJORAR_RESISTENCIA = "mejorar_resistencia",               // Mejorar la resistencia general
-  VOLVER_PAUSA = "volver_pausa",                             // Volver a entrenar después de una pausa
-  POCO_TIEMPO = "poco_tiempo",                               // Preparar competición próxima con poco tiempo
-  BASE_GENERAL = "base_general"                              // Sin carrera objetivo (fuera del cerebro Hyrox)
+  PRIMERA_CARRERA = "primera_carrera",           // Preparar mi primer HYROX
+  MEJORAR_MARCA = "mejorar_marca",               // Mejorar mi marca en HYROX
+  MEJORAR_ESTACIONES = "mejorar_estaciones",     // Mejorar las estaciones funcionales
+  MEJORAR_TRANSICIONES = "mejorar_transiciones", // Mejorar las transiciones
+  VOLVER_PAUSA = "volver_pausa",                 // Volver a entrenar después de una pausa
+  BASE_GENERAL = "base_general"                  // Base de fuerza y resistencia (fuera del cerebro Hyrox)
 }
 
 // Objetivos del cerebro que asumen que el atleta ya ha competido en Hyrox al menos una vez.
 export const HYROX_OBJECTIVES_ASSUMING_RACE_EXPERIENCE: HyroxObjective[] = [
   HyroxObjective.MEJORAR_MARCA,
-  HyroxObjective.CATEGORIA_CONCRETA,
-  HyroxObjective.MEJORAR_CARRERA_ESTACIONES,
   HyroxObjective.MEJORAR_ESTACIONES,
   HyroxObjective.MEJORAR_TRANSICIONES,
-  HyroxObjective.MEJORAR_RESISTENCIA,
   HyroxObjective.VOLVER_PAUSA
 ];
 
@@ -175,13 +167,20 @@ export interface HyroxOnboardingData {
   // "Camino" cualitativo para el resto de objetivos (sin pedir splits): cada objetivo usa el subconjunto que le aplica.
   selfReportedLimitant?: HyroxLimitantType;
   weakStationsSelfReported?: HyroxStation[];
-  doublesRole?: "carrera" | "fuerza" | "equilibrado";
   breakDuration?: "menos_1_mes" | "1_3_meses" | "mas_3_meses";
 
   activeInjury: boolean;
   injuryAreas: string[];
   injuryNotes?: string;
   completedAt?: string;
+}
+
+// Resultado del test de VAM (Velocidad Aeróbica Máxima): test de 6 minutos a máximo esfuerzo sostenible.
+export interface HyroxVAMTestResult {
+  distanceMeters: number;
+  vamKmH: number;
+  vamPaceMinKm: string; // ritmo equivalente, formato mm:ss /km
+  completedAt: string;
 }
 
 export interface HyroxWorkoutSession {

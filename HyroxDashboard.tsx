@@ -1,18 +1,42 @@
-import React from "react";
-import { HyroxTrainingPlan, HyroxObjective } from "./hyroxTypes";
+import React, { useState } from "react";
+import { HyroxTrainingPlan, HyroxObjective, HyroxVAMTestResult } from "./hyroxTypes";
 import { STATION_LABELS, PARCIAL_LABELS } from "./hyroxLibrary";
-import { Activity, TrendingUp, Award, ShieldAlert, Zap, Calendar, Layers, Target, Flag } from "lucide-react";
+import HyroxVAMTestCard from "./HyroxVAMTestCard";
+import { Activity, TrendingUp, Award, ShieldAlert, Zap, Calendar, Layers, Target, Flag, Gauge } from "lucide-react";
+
+const IMC_UNLOCK_WORKOUTS = 10;
 
 interface HyroxDashboardProps {
   plan: HyroxTrainingPlan;
   activeInjury: boolean;
   injuryAreas: string[];
+  completedWorkoutsCount: number;
+  vamTest: HyroxVAMTestResult | null;
+  onSaveVAMTest: (result: HyroxVAMTestResult) => void;
 }
 
-export default function HyroxDashboard({ plan, activeInjury, injuryAreas }: HyroxDashboardProps) {
+export default function HyroxDashboard({ plan, activeInjury, injuryAreas, completedWorkoutsCount, vamTest, onSaveVAMTest }: HyroxDashboardProps) {
   const { initialDiagnostic } = plan;
+  const [showVamTest, setShowVamTest] = useState(false);
 
   const renderBMIWidget = (bmi: number, category: string) => {
+    if (completedWorkoutsCount < IMC_UNLOCK_WORKOUTS) {
+      return (
+        <div className="bg-white rounded-2xl p-6 border border-zinc-200/80 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <Activity className="w-4 h-4 text-blue-600" />
+            <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-900">Composición Corporal (IMC)</h4>
+          </div>
+          <div className="py-5 text-center">
+            <p className="text-2xl font-black text-zinc-400 italic">Analizando…</p>
+          </div>
+          <p className="text-xs text-zinc-500 font-medium leading-relaxed">
+            Disponible al completar {IMC_UNLOCK_WORKOUTS} entrenamientos ({completedWorkoutsCount}/{IMC_UNLOCK_WORKOUTS} completados).
+          </p>
+        </div>
+      );
+    }
+
     const pct = Math.max(0, Math.min(100, ((bmi - 15) / (35 - 15)) * 100));
     let barColor = "bg-blue-600";
     if (category === "Sobrepeso") barColor = "bg-amber-500";
@@ -49,24 +73,14 @@ export default function HyroxDashboard({ plan, activeInjury, injuryAreas }: Hyro
         return "Mi Primera Carrera Hyrox";
       case HyroxObjective.MEJORAR_MARCA:
         return "Mejorar Mi Marca en Hyrox";
-      case HyroxObjective.CATEGORIA_CONCRETA:
-        return "Preparar Mi Categoría";
-      case HyroxObjective.MEJORAR_CARRERA_ESTACIONES:
-        return "Mejorar la Carrera entre Estaciones";
       case HyroxObjective.MEJORAR_ESTACIONES:
         return "Mejorar las Estaciones Funcionales";
       case HyroxObjective.MEJORAR_TRANSICIONES:
         return "Mejorar las Transiciones";
-      case HyroxObjective.DOBLES:
-        return "Preparar Modalidad Dobles";
-      case HyroxObjective.MEJORAR_RESISTENCIA:
-        return "Mejorar Mi Resistencia General";
       case HyroxObjective.VOLVER_PAUSA:
         return "Volver a Entrenar tras una Pausa";
-      case HyroxObjective.POCO_TIEMPO:
-        return "Preparación Exprés de Competición";
       case HyroxObjective.BASE_GENERAL:
-        return "Base de Fuerza y Acondicionamiento";
+        return "Base de Fuerza y Resistencia";
       default:
         return "Plan Hyrox Adaptativo";
     }
@@ -165,26 +179,58 @@ export default function HyroxDashboard({ plan, activeInjury, injuryAreas }: Hyro
               <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-900">Tiempo Objetivo de Carrera</h4>
             </div>
 
-            <p className="text-xs text-zinc-500 font-medium leading-relaxed mb-5">
-              Estimación calculada en base a tu nivel, división y estaciones débiles reportadas.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-4">
-                <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Conservador</p>
-                <p className="text-xl sm:text-2xl font-black text-zinc-900 font-mono mt-1">{initialDiagnostic.estimatedFinishTime.conservador}</p>
-              </div>
-              <div className="bg-blue-50/60 border border-blue-200 rounded-2xl p-4">
-                <p className="text-xs font-bold uppercase tracking-wider text-blue-600">Realista</p>
-                <p className="text-xl sm:text-2xl font-black text-blue-700 font-mono mt-1">{initialDiagnostic.estimatedFinishTime.realista}</p>
-              </div>
-              {initialDiagnostic.estimatedFinishTime.agresivo && (
-                <div className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-4">
-                  <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Agresivo</p>
-                  <p className="text-xl sm:text-2xl font-black text-zinc-900 font-mono mt-1">{initialDiagnostic.estimatedFinishTime.agresivo}</p>
+            {!vamTest ? (
+              <>
+                <div className="py-5 text-center">
+                  <p className="text-2xl font-black text-zinc-400 italic">Analizando…</p>
                 </div>
-              )}
-            </div>
+                <p className="text-xs text-zinc-500 font-medium leading-relaxed mb-4">
+                  Disponible al completar el Test VAM: calcula tu velocidad aeróbica máxima y desbloquea tus zonas de ritmo reales en el Perfil.
+                </p>
+                {!showVamTest ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowVamTest(true)}
+                    className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase tracking-wider text-[11px] cursor-pointer transition flex items-center justify-center gap-1.5"
+                  >
+                    <Gauge className="w-4 h-4" />
+                    Realizar Test VAM
+                  </button>
+                ) : (
+                  <HyroxVAMTestCard
+                    onComplete={result => {
+                      onSaveVAMTest(result);
+                      setShowVamTest(false);
+                    }}
+                    onCancel={() => setShowVamTest(false)}
+                  />
+                )}
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-zinc-500 font-medium leading-relaxed mb-5">
+                  Estimación calculada en base a tu nivel, división y estaciones débiles reportadas. Ritmo VAM: {vamTest.vamPaceMinKm} /km ({vamTest.vamKmH}{" "}
+                  km/h).
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-4">
+                    <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Conservador</p>
+                    <p className="text-xl sm:text-2xl font-black text-zinc-900 font-mono mt-1">{initialDiagnostic.estimatedFinishTime.conservador}</p>
+                  </div>
+                  <div className="bg-blue-50/60 border border-blue-200 rounded-2xl p-4">
+                    <p className="text-xs font-bold uppercase tracking-wider text-blue-600">Realista</p>
+                    <p className="text-xl sm:text-2xl font-black text-blue-700 font-mono mt-1">{initialDiagnostic.estimatedFinishTime.realista}</p>
+                  </div>
+                  {initialDiagnostic.estimatedFinishTime.agresivo && (
+                    <div className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-4">
+                      <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Agresivo</p>
+                      <p className="text-xl sm:text-2xl font-black text-zinc-900 font-mono mt-1">{initialDiagnostic.estimatedFinishTime.agresivo}</p>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
 
             <div className="mt-5 bg-zinc-50 border border-zinc-200/80 rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-3">

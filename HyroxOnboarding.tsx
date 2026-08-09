@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   HyroxDivision,
@@ -36,12 +36,7 @@ interface HyroxOnboardingProps {
 
 type StepKey = "objetivo" | "categoria" | "experiencia" | "fecha" | "rendimiento" | "camino" | "gimnasio" | "frecuencia_lesiones" | "perfil";
 
-const CAMINO_OBJECTIVES = [
-  HyroxObjective.MEJORAR_ESTACIONES,
-  HyroxObjective.MEJORAR_RESISTENCIA,
-  HyroxObjective.DOBLES,
-  HyroxObjective.VOLVER_PAUSA
-];
+const CAMINO_OBJECTIVES = [HyroxObjective.MEJORAR_ESTACIONES, HyroxObjective.VOLVER_PAUSA];
 
 function getStepsForObjective(objective: HyroxObjective): StepKey[] {
   const steps: StepKey[] = ["objetivo"];
@@ -87,15 +82,10 @@ function deriveDivision(category: HyroxRaceCategory): HyroxDivision {
 const OBJECTIVE_OPTIONS: Array<{ val: HyroxObjective; title: string; desc: string }> = [
   { val: HyroxObjective.PRIMERA_CARRERA, title: "Preparar mi primer HYROX", desc: "Nunca he competido. Quiero llegar a la línea de salida con garantías." },
   { val: HyroxObjective.MEJORAR_MARCA, title: "Mejorar mi marca en HYROX", desc: "Ya he competido y tengo mis tiempos. Quiero bajar mi tiempo total." },
-  { val: HyroxObjective.CATEGORIA_CONCRETA, title: "Preparar una categoría concreta", desc: "Quiero prepararme específicamente para una categoría/división." },
-  { val: HyroxObjective.MEJORAR_CARRERA_ESTACIONES, title: "Mejorar la carrera entre estaciones", desc: "Se me cae el ritmo de carrera cuando encadeno con las estaciones." },
   { val: HyroxObjective.MEJORAR_ESTACIONES, title: "Mejorar las estaciones funcionales", desc: "Las estaciones me cuestan más que la carrera." },
   { val: HyroxObjective.MEJORAR_TRANSICIONES, title: "Mejorar las transiciones", desc: "Pierdo mucho tiempo al entrar y salir de cada estación." },
-  { val: HyroxObjective.DOBLES, title: "Competir en modalidad Dobles", desc: "Voy a competir en pareja/equipo." },
-  { val: HyroxObjective.MEJORAR_RESISTENCIA, title: "Mejorar la resistencia general", desc: "Quiero aguantar mejor el conjunto de la prueba." },
   { val: HyroxObjective.VOLVER_PAUSA, title: "Volver a entrenar tras una pausa", desc: "He estado un tiempo parado y quiero retomar con cabeza." },
-  { val: HyroxObjective.POCO_TIEMPO, title: "Preparar una competición próxima con poco tiempo", desc: "Tengo una carrera cerca y poco margen de preparación." },
-  { val: HyroxObjective.BASE_GENERAL, title: "Base de fuerza y acondicionamiento", desc: "Sin carrera fijada. Quiero mejorar mi condición física funcional." }
+  { val: HyroxObjective.BASE_GENERAL, title: "Base de fuerza y resistencia", desc: "Sin carrera fijada. Quiero mejorar mi condición física de base." }
 ];
 
 function formatEUDateInput(raw: string): string {
@@ -148,17 +138,77 @@ function ThreeTierSelector<T extends string>({
   );
 }
 
-function TimeInput({ label, value, onChange, placeholder = "mm:ss" }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+// Input de tiempo por celdas (hh/mm/ss o mm/ss): el usuario nunca escribe ":", solo rellena cada celda.
+export function SegmentedTimeInput({
+  label,
+  value,
+  onChange,
+  mode = "ms"
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  mode?: "ms" | "hms";
+}) {
+  const segments: Array<"h" | "m" | "s"> = mode === "hms" ? ["h", "m", "s"] : ["m", "s"];
+  const raw = value ? value.split(":") : [];
+  const cellValues: string[] =
+    mode === "hms"
+      ? raw.length === 3
+        ? raw
+        : raw.length === 2
+        ? ["", raw[0], raw[1]]
+        : ["", "", ""]
+      : raw.length === 2
+      ? raw
+      : raw.length === 3
+      ? [raw[1], raw[2]]
+      : ["", ""];
+
+  const refs = useRef<Array<HTMLInputElement | null>>([]);
+
+  const handleChange = (idx: number, next: string) => {
+    const digits = next.replace(/\D/g, "").slice(0, 2);
+    const updated = [...cellValues];
+    updated[idx] = digits;
+    onChange(updated.join(":"));
+    if (digits.length === 2 && idx < segments.length - 1) {
+      refs.current[idx + 1]?.focus();
+    }
+  };
+
+  const handleKeyDown = (idx: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && cellValues[idx] === "" && idx > 0) {
+      refs.current[idx - 1]?.focus();
+    }
+  };
+
+  const segmentLabel: Record<"h" | "m" | "s", string> = { h: "h", m: "m", s: "s" };
+
   return (
     <div className="space-y-1.5">
       <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 block">{label}</label>
-      <input
-        type="text"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full bg-white border border-zinc-200/80 rounded-xl px-3 py-2.5 text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold font-mono text-sm"
-      />
+      <div className="flex items-center gap-1">
+        {segments.map((seg, idx) => (
+          <React.Fragment key={seg}>
+            {idx > 0 && <span className="text-zinc-400 font-bold pb-4">:</span>}
+            <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
+              <input
+                ref={el => (refs.current[idx] = el)}
+                type="text"
+                inputMode="numeric"
+                value={cellValues[idx]}
+                onChange={e => handleChange(idx, e.target.value)}
+                onKeyDown={e => handleKeyDown(idx, e)}
+                placeholder="00"
+                maxLength={2}
+                className="w-full bg-white border border-zinc-200/80 rounded-xl px-1 py-2.5 text-center text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold font-mono text-sm"
+              />
+              <span className="text-[9px] text-zinc-400 font-bold uppercase">{segmentLabel[seg]}</span>
+            </div>
+          </React.Fragment>
+        ))}
+      </div>
     </div>
   );
 }
@@ -202,8 +252,6 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
 
   // Camino cualitativo (resto de objetivos)
   const [estacionesTipo, setEstacionesTipo] = useState<HyroxLimitantType>("fuerza_maxima");
-  const [resistenciaTipo, setResistenciaTipo] = useState<HyroxLimitantType>("carrera");
-  const [doublesRole, setDoublesRole] = useState<"carrera" | "fuerza" | "equilibrado">("equilibrado");
   const [breakDuration, setBreakDuration] = useState<"menos_1_mes" | "1_3_meses" | "mas_3_meses">("1_3_meses");
   const [weakStationsSelfReported, setWeakStationsSelfReported] = useState<HyroxStation[]>([]);
 
@@ -241,10 +289,8 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
     }
 
     let selfReportedLimitant: HyroxLimitantType | undefined;
-    if (objective === HyroxObjective.MEJORAR_CARRERA_ESTACIONES) selfReportedLimitant = "carrera";
-    else if (objective === HyroxObjective.MEJORAR_TRANSICIONES) selfReportedLimitant = "transiciones";
+    if (objective === HyroxObjective.MEJORAR_TRANSICIONES) selfReportedLimitant = "transiciones";
     else if (objective === HyroxObjective.MEJORAR_ESTACIONES) selfReportedLimitant = estacionesTipo;
-    else if (objective === HyroxObjective.MEJORAR_RESISTENCIA) selfReportedLimitant = resistenciaTipo;
 
     const performance: HyroxPerformanceData | undefined =
       objective === HyroxObjective.MEJORAR_MARCA
@@ -270,7 +316,6 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
       performance,
       selfReportedLimitant,
       weakStationsSelfReported: objective === HyroxObjective.MEJORAR_ESTACIONES ? weakStationsSelfReported : undefined,
-      doublesRole: objective === HyroxObjective.DOBLES ? doublesRole : undefined,
       breakDuration: objective === HyroxObjective.VOLVER_PAUSA ? breakDuration : undefined,
       activeInjury,
       injuryAreas,
@@ -426,7 +471,7 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
           {stepKey === "fecha" && (
             <div className="bg-white p-4 rounded-2xl border border-zinc-200/80 space-y-2 shadow-sm">
               <label className="text-xs font-bold uppercase tracking-wider text-zinc-700 flex items-center justify-between gap-2">
-                <span>Fecha de tu carrera Hyrox {objective === HyroxObjective.POCO_TIEMPO ? "" : "(Opcional)"}</span>
+                <span>Fecha de tu carrera Hyrox (Opcional)</span>
                 <span className="text-[9px] bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full font-bold border border-blue-100">Recomendado</span>
               </label>
               <input
@@ -449,33 +494,32 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
               <p className="text-xs text-zinc-500 font-medium leading-relaxed">
                 Con tus tiempos reales podemos detectar tu limitante principal comparándolos con la tabla de referencia de tu categoría.
               </p>
-              <TimeInput label="Tiempo total Hyrox" value={totalTime} onChange={setTotalTime} placeholder="hh:mm:ss" />
+              <SegmentedTimeInput label="Tiempo total Hyrox" value={totalTime} onChange={setTotalTime} mode="hms" />
               <div className="space-y-2">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 block">Splits de carrera (8 x 1 km)</label>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {runSplits.map((s, i) => (
-                    <input
-                      key={i}
-                      type="text"
-                      value={s}
-                      onChange={e => setRunSplits(prev => prev.map((v, idx) => (idx === i ? e.target.value : v)))}
-                      placeholder={`km${i + 1}`}
-                      className="w-full bg-white border border-zinc-200/80 rounded-xl px-2 py-2 text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold font-mono text-xs text-center"
-                    />
+                    <div key={i}>
+                      <SegmentedTimeInput
+                        label={`Km ${i + 1}`}
+                        value={s}
+                        onChange={v => setRunSplits(prev => prev.map((val, idx) => (idx === i ? v : val)))}
+                      />
+                    </div>
                   ))}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <TimeInput label="Ski Erg" value={skiErg} onChange={setSkiErg} />
-                <TimeInput label="Sled Push" value={sledPush} onChange={setSledPush} />
-                <TimeInput label="Sled Pull" value={sledPull} onChange={setSledPull} />
-                <TimeInput label="Burpee Broad Jump" value={burpeeBroadJump} onChange={setBurpeeBroadJump} />
-                <TimeInput label="Row" value={row} onChange={setRow} />
-                <TimeInput label="Farmers Carry" value={farmersCarry} onChange={setFarmersCarry} />
-                <TimeInput label="Sandbag Lunges" value={sandbagLunges} onChange={setSandbagLunges} />
-                <TimeInput label="Wall Balls" value={wallBalls} onChange={setWallBalls} />
+                <SegmentedTimeInput label="Ski Erg" value={skiErg} onChange={setSkiErg} />
+                <SegmentedTimeInput label="Sled Push" value={sledPush} onChange={setSledPush} />
+                <SegmentedTimeInput label="Sled Pull" value={sledPull} onChange={setSledPull} />
+                <SegmentedTimeInput label="Burpee Broad Jump" value={burpeeBroadJump} onChange={setBurpeeBroadJump} />
+                <SegmentedTimeInput label="Row" value={row} onChange={setRow} />
+                <SegmentedTimeInput label="Farmers Carry" value={farmersCarry} onChange={setFarmersCarry} />
+                <SegmentedTimeInput label="Sandbag Lunges" value={sandbagLunges} onChange={setSandbagLunges} />
+                <SegmentedTimeInput label="Wall Balls" value={wallBalls} onChange={setWallBalls} />
               </div>
-              <TimeInput label="Tiempo total de transiciones (Roxzone)" value={roxzoneTotal} onChange={setRoxzoneTotal} />
+              <SegmentedTimeInput label="Tiempo total de transiciones (Roxzone)" value={roxzoneTotal} onChange={setRoxzoneTotal} />
             </div>
           )}
 
@@ -525,57 +569,6 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
                         );
                       })}
                     </div>
-                  </div>
-                </>
-              )}
-
-              {objective === HyroxObjective.MEJORAR_RESISTENCIA && (
-                <>
-                  <p className="text-xs text-zinc-500 font-medium leading-relaxed">¿Dónde notas más que te falta resistencia?</p>
-                  <div className="space-y-2.5">
-                    {[
-                      { val: "carrera" as HyroxLimitantType, label: "En la carrera", desc: "El ritmo de carrera cae claramente a medida que avanza la prueba." },
-                      { val: "fuerza_resistencia" as HyroxLimitantType, label: "En las estaciones", desc: "Aguanto bien corriendo, pero las estaciones me dejan sin fuerzas." }
-                    ].map(o => (
-                      <button
-                        key={o.val}
-                        type="button"
-                        onClick={() => setResistenciaTipo(o.val)}
-                        className={`w-full px-4 py-3.5 rounded-xl border text-left transition cursor-pointer flex justify-between items-center gap-3 ${
-                          resistenciaTipo === o.val ? "bg-blue-50 border-blue-600 text-blue-900" : "bg-white border-zinc-200/80 text-zinc-700 hover:border-zinc-300"
-                        }`}
-                      >
-                        <div>
-                          <span className="text-xs font-black uppercase tracking-wider block">{o.label}</span>
-                          <span className="text-[11px] text-zinc-500 font-medium leading-relaxed">{o.desc}</span>
-                        </div>
-                        {resistenciaTipo === o.val && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {objective === HyroxObjective.DOBLES && (
-                <>
-                  <p className="text-xs text-zinc-500 font-medium leading-relaxed">¿Cuál será tu rol dentro del equipo de dobles?</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { val: "carrera" as const, label: "Más carrera" },
-                      { val: "fuerza" as const, label: "Más fuerza" },
-                      { val: "equilibrado" as const, label: "Equilibrado" }
-                    ].map(o => (
-                      <button
-                        key={o.val}
-                        type="button"
-                        onClick={() => setDoublesRole(o.val)}
-                        className={`py-3 text-center rounded-xl border font-bold uppercase tracking-wider text-xs transition cursor-pointer ${
-                          doublesRole === o.val ? "bg-blue-50 border-blue-600 text-blue-900 shadow-sm" : "bg-white border-zinc-200/80 hover:border-zinc-300 text-zinc-600"
-                        }`}
-                      >
-                        {o.label}
-                      </button>
-                    ))}
                   </div>
                 </>
               )}

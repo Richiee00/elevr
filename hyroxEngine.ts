@@ -179,6 +179,69 @@ export function classifyAdherence(completed: number, planned: number): { pct: nu
 }
 
 // ============================================================================
+// TEST DE VAM Y ZONAS DE ENTRENAMIENTO
+// Test estándar de 6 minutos a máximo esfuerzo sostenible. VAM = distancia/tiempo.
+// Zonas como % de VAM (estándar de 5 zonas): Z1 <70% · Z2 70-80% · Z3 80-88% · Z4 88-95% · Z5 95%+.
+// ============================================================================
+
+export const VAM_TEST_DURATION_MIN = 6;
+
+function formatPaceMinKm(paceMinPerKm: number): string {
+  if (!Number.isFinite(paceMinPerKm) || paceMinPerKm <= 0) return "--:--";
+  const min = Math.floor(paceMinPerKm);
+  const sec = Math.round((paceMinPerKm - min) * 60);
+  return `${min}:${sec.toString().padStart(2, "0")}`;
+}
+
+export function calculateVAMFromTest(distanceMeters: number): { vamKmH: number; vamPaceMinKm: string } {
+  const km = distanceMeters / 1000;
+  const hours = VAM_TEST_DURATION_MIN / 60;
+  const vamKmH = hours > 0 ? km / hours : 0;
+  const paceMinPerKm = vamKmH > 0 ? 60 / vamKmH : 0;
+  return { vamKmH: Math.round(vamKmH * 100) / 100, vamPaceMinKm: formatPaceMinKm(paceMinPerKm) };
+}
+
+export interface HyroxTrainingZone {
+  key: "z1" | "z2" | "z3" | "z4" | "z5";
+  label: string;
+  pctRange: string;
+  paceRange: string;
+  description: string;
+}
+
+const ZONE_DEFS: Array<{ key: HyroxTrainingZone["key"]; label: string; pctMin: number; pctMax: number | null; description: string }> = [
+  { key: "z1", label: "Z1 · Regenerativo", pctMin: 0, pctMax: 70, description: "Recuperación activa y rodajes muy suaves." },
+  { key: "z2", label: "Z2 · Aeróbico", pctMin: 70, pctMax: 80, description: "Base aeróbica, rodajes largos." },
+  { key: "z3", label: "Z3 · Umbral aeróbico", pctMin: 80, pctMax: 88, description: "Ritmo controlado, tempo suave." },
+  { key: "z4", label: "Z4 · Umbral anaeróbico", pctMin: 88, pctMax: 95, description: "Series de umbral, ritmo objetivo de carrera en Hyrox." },
+  { key: "z5", label: "Z5 · VO2max", pctMin: 95, pctMax: null, description: "Series cortas de máxima intensidad." }
+];
+
+export function calculateHyroxTrainingZones(vamKmH: number): HyroxTrainingZone[] {
+  return ZONE_DEFS.map(z => {
+    const fastPace = formatPaceMinKm(60 / (vamKmH * ((z.pctMax ?? 100) / 100)));
+    const slowPace = z.pctMin > 0 ? formatPaceMinKm(60 / (vamKmH * (z.pctMin / 100))) : null;
+
+    let paceRange: string;
+    if (z.pctMin === 0) {
+      paceRange = `Más lento que ${fastPace} /km`;
+    } else if (z.pctMax == null) {
+      paceRange = `Más rápido que ${slowPace} /km`;
+    } else {
+      paceRange = `${fastPace} - ${slowPace} /km`;
+    }
+
+    return {
+      key: z.key,
+      label: z.label,
+      pctRange: z.pctMax != null ? `${z.pctMin}-${z.pctMax}% VAM` : `${z.pctMin}%+ VAM`,
+      paceRange,
+      description: z.description
+    };
+  });
+}
+
+// ============================================================================
 // PARTE 1 — HYROX MASTER BRAIN: BENCHMARKS Y LIMITANTES
 // ============================================================================
 

@@ -1,19 +1,21 @@
 import React, { useState, useMemo } from "react";
 import { motion } from "motion/react";
-import { HyroxOnboardingData, HyroxObjective, HyroxTrainingPlan } from "./hyroxTypes";
+import { HyroxOnboardingData, HyroxObjective, HyroxTrainingPlan, HyroxVAMTestResult } from "./hyroxTypes";
 import { STATION_LABELS } from "./hyroxLibrary";
-import { calculateBMI } from "./hyroxEngine";
+import { calculateBMI, calculateHyroxTrainingZones } from "./hyroxEngine";
 import { formatDateEU } from "./engines";
-import { User, Activity, Check, Calendar, TrendingUp, Flag, Dumbbell } from "lucide-react";
+import HyroxRaceStrategyCard from "./HyroxRaceStrategyCard";
+import { User, Activity, Check, Calendar, TrendingUp, Flag, Dumbbell, Gauge } from "lucide-react";
 
 interface HyroxProfileViewProps {
   onboarding: HyroxOnboardingData;
   plan: HyroxTrainingPlan;
   onUpdateProfile: (updated: HyroxOnboardingData) => void;
   completedWorkouts: Record<string, { feedback: string; rpe: number; date: string }>;
+  vamTest: HyroxVAMTestResult | null;
 }
 
-export default function HyroxProfileView({ onboarding, plan, onUpdateProfile, completedWorkouts }: HyroxProfileViewProps) {
+export default function HyroxProfileView({ onboarding, plan, onUpdateProfile, completedWorkouts, vamTest }: HyroxProfileViewProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [age, setAge] = useState<string>(String(onboarding.age ?? ""));
   const [height, setHeight] = useState<string>(String(onboarding.height ?? ""));
@@ -55,24 +57,14 @@ export default function HyroxProfileView({ onboarding, plan, onUpdateProfile, co
         return "Mi Primera Carrera Hyrox";
       case HyroxObjective.MEJORAR_MARCA:
         return "Mejorar Mi Marca en Hyrox";
-      case HyroxObjective.CATEGORIA_CONCRETA:
-        return "Preparar Mi Categoría";
-      case HyroxObjective.MEJORAR_CARRERA_ESTACIONES:
-        return "Mejorar la Carrera entre Estaciones";
       case HyroxObjective.MEJORAR_ESTACIONES:
         return "Mejorar las Estaciones Funcionales";
       case HyroxObjective.MEJORAR_TRANSICIONES:
         return "Mejorar las Transiciones";
-      case HyroxObjective.DOBLES:
-        return "Preparar Modalidad Dobles";
-      case HyroxObjective.MEJORAR_RESISTENCIA:
-        return "Mejorar Mi Resistencia General";
       case HyroxObjective.VOLVER_PAUSA:
         return "Volver a Entrenar tras una Pausa";
-      case HyroxObjective.POCO_TIEMPO:
-        return "Preparación Exprés de Competición";
       case HyroxObjective.BASE_GENERAL:
-        return "Base de Fuerza y Acondicionamiento";
+        return "Base de Fuerza y Resistencia";
       default:
         return "Plan Hyrox";
     }
@@ -289,6 +281,34 @@ export default function HyroxProfileView({ onboarding, plan, onUpdateProfile, co
           </div>
         </div>
       </div>
+
+      {vamTest && (
+        <div className="bg-white rounded-2xl p-5 border border-zinc-200/80 shadow-sm space-y-4">
+          <div className="flex items-center gap-2">
+            <Gauge className="w-4 h-4 text-blue-600" />
+            <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-900">Zonas de Entrenamiento</h4>
+          </div>
+          <p className="text-xs text-zinc-500 font-medium leading-relaxed">
+            Calculadas a partir de tu Test VAM: {vamTest.vamPaceMinKm} /km ({vamTest.vamKmH} km/h), realizado el {formatDateEU(vamTest.completedAt)}.
+          </p>
+          <div className="space-y-2">
+            {calculateHyroxTrainingZones(vamTest.vamKmH).map(zone => (
+              <div key={zone.key} className="bg-zinc-50 border border-zinc-200/80 rounded-xl p-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black text-zinc-900">{zone.label}</p>
+                  <p className="text-[10px] text-zinc-500 font-medium mt-0.5">{zone.description}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-black text-blue-700 font-mono">{zone.paceRange}</p>
+                  <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider mt-0.5">{zone.pctRange}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <HyroxRaceStrategyCard onboarding={onboarding} />
     </div>
   );
 }

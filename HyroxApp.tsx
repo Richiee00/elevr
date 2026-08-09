@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { HyroxOnboardingData, HyroxTrainingPlan } from "./hyroxTypes";
+import { HyroxOnboardingData, HyroxTrainingPlan, HyroxVAMTestResult } from "./hyroxTypes";
 import { HyroxDailyInput, generateHyroxPlan } from "./hyroxEngine";
 
 import HyroxLanding from "./HyroxLanding";
@@ -25,6 +25,7 @@ export default function HyroxApp({ onSwitchApp }: HyroxAppProps) {
   const [currentWeekIndex, setCurrentWeekIndex] = useState<number>(0);
   const [readinessHistory, setReadinessHistory] = useState<Record<string, HyroxDailyInput>>({});
   const [completedWorkouts, setCompletedWorkouts] = useState<Record<string, { feedback: string; rpe: number; date: string }>>({});
+  const [vamTest, setVamTest] = useState<HyroxVAMTestResult | null>(null);
 
   useEffect(() => {
     try {
@@ -33,6 +34,7 @@ export default function HyroxApp({ onSwitchApp }: HyroxAppProps) {
       const savedWeekIdx = localStorage.getItem("hyrox_plan_current_week");
       const savedReadiness = localStorage.getItem("hyrox_plan_readiness");
       const savedCompleted = localStorage.getItem("hyrox_plan_completed_workouts");
+      const savedVamTest = localStorage.getItem("hyrox_plan_vam_test");
 
       if (savedOnboarding) setOnboarding(JSON.parse(savedOnboarding));
 
@@ -44,6 +46,7 @@ export default function HyroxApp({ onSwitchApp }: HyroxAppProps) {
       if (savedWeekIdx) setCurrentWeekIndex(Number(savedWeekIdx));
       if (savedReadiness) setReadinessHistory(JSON.parse(savedReadiness));
       if (savedCompleted) setCompletedWorkouts(JSON.parse(savedCompleted));
+      if (savedVamTest) setVamTest(JSON.parse(savedVamTest));
     } catch (e) {
       console.error("Error loading localStorage Hyrox plan state:", e);
     }
@@ -95,12 +98,18 @@ export default function HyroxApp({ onSwitchApp }: HyroxAppProps) {
     localStorage.setItem("hyrox_plan_completed_workouts", JSON.stringify(newCompleted));
   };
 
+  const handleSaveVAMTest = (result: HyroxVAMTestResult) => {
+    setVamTest(result);
+    localStorage.setItem("hyrox_plan_vam_test", JSON.stringify(result));
+  };
+
   const handleResetAll = () => {
     setOnboarding(null);
     setPlan(null);
     setCurrentWeekIndex(0);
     setReadinessHistory({});
     setCompletedWorkouts({});
+    setVamTest(null);
     setActiveTab("landing");
 
     localStorage.removeItem("hyrox_plan_onboarding");
@@ -108,6 +117,7 @@ export default function HyroxApp({ onSwitchApp }: HyroxAppProps) {
     localStorage.removeItem("hyrox_plan_current_week");
     localStorage.removeItem("hyrox_plan_readiness");
     localStorage.removeItem("hyrox_plan_completed_workouts");
+    localStorage.removeItem("hyrox_plan_vam_test");
   };
 
   const todayKey = new Date().toISOString().split("T")[0];
@@ -182,7 +192,14 @@ export default function HyroxApp({ onSwitchApp }: HyroxAppProps) {
 
           {activeTab === "dashboard" && plan && (
             <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-              <HyroxDashboard plan={plan} activeInjury={onboarding?.activeInjury || false} injuryAreas={onboarding?.injuryAreas || []} />
+              <HyroxDashboard
+                plan={plan}
+                activeInjury={onboarding?.activeInjury || false}
+                injuryAreas={onboarding?.injuryAreas || []}
+                completedWorkoutsCount={Object.keys(completedWorkouts).length}
+                vamTest={vamTest}
+                onSaveVAMTest={handleSaveVAMTest}
+              />
             </motion.div>
           )}
 
@@ -222,7 +239,7 @@ export default function HyroxApp({ onSwitchApp }: HyroxAppProps) {
 
           {activeTab === "profile" && onboarding && plan && (
             <motion.div key="profile" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-              <HyroxProfileView onboarding={onboarding} plan={plan} onUpdateProfile={handleUpdateProfile} completedWorkouts={completedWorkouts} />
+              <HyroxProfileView onboarding={onboarding} plan={plan} onUpdateProfile={handleUpdateProfile} completedWorkouts={completedWorkouts} vamTest={vamTest} />
             </motion.div>
           )}
         </AnimatePresence>
