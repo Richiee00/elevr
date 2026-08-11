@@ -34,6 +34,9 @@ function resolveBootStage(): Stage {
 
 export default function Root() {
   const [stage, setStage] = useState<Stage>(() => resolveBootStage());
+  // Recuerda desde qué disciplina se abrió el selector cuando se usa como "cambiar de disciplina"
+  // en vez de como el primer paso del onboarding, para poder volver directamente a ella con "Atrás".
+  const [switchOrigin, setSwitchOrigin] = useState<Stage | null>(null);
 
   const handleCompleteRunning = (data: OnboardingData) => {
     const plan = generateTrainingPlan(data);
@@ -54,6 +57,7 @@ export default function Root() {
   };
 
   const handleSelectDiscipline = (discipline: Discipline) => {
+    setSwitchOrigin(null);
     if (discipline === "running") {
       if (localStorage.getItem("run_plan_data")) {
         localStorage.setItem("elevr_active_app", "running");
@@ -72,10 +76,13 @@ export default function Root() {
     // gym / salud: intentionally no-op for now
   };
 
-  const handleSwitchApp = () => setStage("discipline");
+  const handleSwitchDiscipline = () => {
+    setSwitchOrigin(stage);
+    setStage("discipline");
+  };
 
-  if (stage === "app-running") return <App onSwitchApp={handleSwitchApp} />;
-  if (stage === "app-hyrox") return <HyroxApp onSwitchApp={handleSwitchApp} />;
+  if (stage === "app-running") return <App onSwitchDiscipline={handleSwitchDiscipline} />;
+  if (stage === "app-hyrox") return <HyroxApp onSwitchDiscipline={handleSwitchDiscipline} />;
 
   const hasAnyPlan = !!localStorage.getItem("run_plan_data") || !!localStorage.getItem("hyrox_plan_data");
 
@@ -102,7 +109,18 @@ export default function Root() {
 
           {stage === "discipline" && (
             <motion.div key="discipline" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-              <DisciplineSelect onSelect={handleSelectDiscipline} onBack={() => setStage("landing")} />
+              <DisciplineSelect
+                mode={switchOrigin ? "switch" : "onboarding"}
+                onSelect={handleSelectDiscipline}
+                onBack={() => {
+                  if (switchOrigin) {
+                    setStage(switchOrigin);
+                    setSwitchOrigin(null);
+                  } else {
+                    setStage("landing");
+                  }
+                }}
+              />
             </motion.div>
           )}
 

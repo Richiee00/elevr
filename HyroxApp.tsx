@@ -14,10 +14,10 @@ import HyroxCalendarView from "./HyroxCalendarView";
 import { LayoutDashboard, CalendarDays, Calendar, Flame, LogOut, User, ArrowLeftRight } from "lucide-react";
 
 interface HyroxAppProps {
-  onSwitchApp: () => void;
+  onSwitchDiscipline: () => void;
 }
 
-export default function HyroxApp({ onSwitchApp }: HyroxAppProps) {
+export default function HyroxApp({ onSwitchDiscipline }: HyroxAppProps) {
   const [activeTab, setActiveTab] = useState<"landing" | "onboarding" | "dashboard" | "today" | "plan" | "profile" | "calendar">("landing");
 
   const [onboarding, setOnboarding] = useState<HyroxOnboardingData | null>(null);
@@ -156,8 +156,8 @@ export default function HyroxApp({ onSwitchApp }: HyroxAppProps) {
 
             <div className="flex items-center gap-2">
               <button
-                onClick={onSwitchApp}
-                title="Cambiar de app"
+                onClick={onSwitchDiscipline}
+                title="Cambiar de disciplina"
                 className="flex p-2.5 rounded-2xl bg-zinc-100 border border-zinc-200 text-zinc-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition cursor-pointer shadow-xs"
               >
                 <ArrowLeftRight className="w-4 h-4" />

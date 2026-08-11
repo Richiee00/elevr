@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { HyroxBlock, HyroxExercise, HyroxWorkoutTemplate } from "./hyroxTypes";
 import { STATION_LABELS, CATEGORY_LABELS } from "./hyroxLibrary";
-import { blockFormatLabel, parseDurationToSeconds } from "./hyroxEngine";
+import { applyRoundsMultiplier, blockFormatLabel, parseDurationToSeconds } from "./hyroxEngine";
 import { formatDateEU } from "./engines";
 import {
   Clock,
@@ -18,7 +18,8 @@ import {
   CalendarClock,
   Smile,
   Frown,
-  Meh
+  Meh,
+  Moon
 } from "lucide-react";
 
 interface ExecStep {
@@ -137,13 +138,9 @@ export default function HyroxWorkoutDetail({
   const [selectedFeedback, setSelectedFeedback] = useState<string>("adecuado");
   const [selectedRpe, setSelectedRpe] = useState<number>(6);
 
-  const adjustedBlocks = useMemo(
-    () =>
-      template.blocks.map(b =>
-        b.rounds ? { ...b, rounds: Math.max(1, Math.round(b.rounds * roundsMultiplier)) } : b
-      ),
-    [template, roundsMultiplier]
-  );
+  const adjustedBlocks = useMemo(() => template.blocks.map(b => applyRoundsMultiplier(b, roundsMultiplier)), [template, roundsMultiplier]);
+  const isRestSubstitution = roundsMultiplier === 0;
+  const hasRoundsChange = !isRestSubstitution && template.blocks.some((b, i) => b.rounds !== adjustedBlocks[i].rounds);
 
   const steps = useMemo(() => buildExecSteps(adjustedBlocks), [adjustedBlocks]);
   const currentStep = steps[currentStepIdx] ?? steps[0];
@@ -218,43 +215,91 @@ export default function HyroxWorkoutDetail({
 
               <p className="text-xs text-zinc-600 font-medium leading-relaxed">{template.description}</p>
 
-              <div className="space-y-3">
-                {adjustedBlocks.map((block, bIdx) => (
-                  <div key={bIdx} className="bg-white border border-zinc-200/80 rounded-2xl overflow-hidden shadow-xs">
-                    <div className="flex items-center justify-between px-4 py-2.5 bg-zinc-50 border-b border-zinc-100">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
-                        {block.label ?? blockFormatLabel(block.format)}
-                        {block.rounds && block.rounds > 1 ? ` · ${block.rounds} rondas` : ""}
-                      </span>
-                      {(block.durationCap || block.workDuration) && (
-                        <span className="text-[10px] font-bold text-zinc-500 flex items-center gap-1">
-                          <Clock className="w-3 h-3" /> {block.durationCap || block.workDuration}
-                        </span>
-                      )}
+              {hasRoundsChange && !isRestSubstitution && (
+                <div className="p-3 bg-rose-50/60 border border-rose-200 rounded-xl flex items-start gap-2 text-xs text-rose-900 font-medium leading-relaxed">
+                  <X className="w-3.5 h-3.5 shrink-0 mt-0.5 text-rose-500" />
+                  <span>
+                    Las rondas tachadas en <span className="line-through decoration-rose-400 font-bold">rojo</span> eran el plan original — hoy se han reducido según tu readiness.
+                  </span>
+                </div>
+              )}
+
+              {isRestSubstitution ? (
+                <div className="bg-white border border-rose-200 rounded-2xl p-5 space-y-4">
+                  <div className="flex items-center gap-2.5">
+                    <Moon className="w-5 h-5 text-rose-500 shrink-0" />
+                    <div>
+                      <p className="text-xs font-bold text-zinc-900 uppercase tracking-wider">Sesión sustituida por descanso</p>
+                      <p className="text-[11px] text-zinc-500 font-medium mt-0.5">Tu readiness de hoy no aconseja entrenar esta sesión estructurada.</p>
                     </div>
-                    <div className="divide-y divide-zinc-100">
-                      {block.exercises.map((ex, exIdx) => (
-                        <div key={exIdx} className="flex items-center gap-3 px-4 py-3">
-                          <span className="w-6 h-6 rounded-full bg-zinc-100 text-zinc-500 text-[10px] font-bold flex items-center justify-center shrink-0">
-                            {exIdx + 1}
-                          </span>
-                          <div className="min-w-0">
-                            <p className="text-xs sm:text-sm font-bold text-zinc-900">{ex.name}</p>
-                            <p className="text-xs text-zinc-500 font-medium">{exerciseLine(ex)}</p>
-                          </div>
-                        </div>
+                  </div>
+                  <div className="pt-3 border-t border-zinc-100 space-y-2">
+                    <span className="text-[9px] font-bold text-rose-400 uppercase tracking-wider block">Plan original de hoy (descartado)</span>
+                    <p className="text-sm font-bold text-rose-700 line-through decoration-2 decoration-rose-400">{template.name}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {template.blocks.map((block, bIdx) => (
+                        <span key={bIdx} className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-500 text-[10px] font-bold border border-rose-200 line-through decoration-rose-300">
+                          {block.label ?? blockFormatLabel(block.format)}
+                          {block.rounds && block.rounds > 1 ? ` · ${block.rounds} rondas` : ""}
+                        </span>
                       ))}
                     </div>
-                    {block.restBetween && (
-                      <div className="px-4 py-2 bg-zinc-50 border-t border-zinc-100 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                        Descanso entre rondas: {block.restBetween}
-                      </div>
-                    )}
                   </div>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {adjustedBlocks.map((block, bIdx) => {
+                    const originalRounds = template.blocks[bIdx]?.rounds;
+                    const roundsChanged = hasRoundsChange && originalRounds != null && originalRounds !== block.rounds;
+                    return (
+                      <div key={bIdx} className="bg-white border border-zinc-200/80 rounded-2xl overflow-hidden shadow-xs">
+                        <div className="flex items-center justify-between px-4 py-2.5 bg-zinc-50 border-b border-zinc-100">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
+                            {block.label ?? blockFormatLabel(block.format)}
+                            {roundsChanged ? (
+                              <>
+                                {" · "}
+                                <span className="line-through decoration-rose-400 text-rose-500">{originalRounds} rondas</span>
+                                {" → "}
+                                <span className="text-blue-700 font-black">{block.rounds} rondas</span>
+                              </>
+                            ) : block.rounds && block.rounds > 1 ? (
+                              ` · ${block.rounds} rondas`
+                            ) : (
+                              ""
+                            )}
+                          </span>
+                          {(block.durationCap || block.workDuration) && (
+                            <span className="text-[10px] font-bold text-zinc-500 flex items-center gap-1">
+                              <Clock className="w-3 h-3" /> {block.durationCap || block.workDuration}
+                            </span>
+                          )}
+                        </div>
+                        <div className="divide-y divide-zinc-100">
+                          {block.exercises.map((ex, exIdx) => (
+                            <div key={exIdx} className="flex items-center gap-3 px-4 py-3">
+                              <span className="w-6 h-6 rounded-full bg-zinc-100 text-zinc-500 text-[10px] font-bold flex items-center justify-center shrink-0">
+                                {exIdx + 1}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="text-xs sm:text-sm font-bold text-zinc-900">{ex.name}</p>
+                                <p className="text-xs text-zinc-500 font-medium">{exerciseLine(ex)}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {block.restBetween && (
+                          <div className="px-4 py-2 bg-zinc-50 border-t border-zinc-100 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Descanso entre rondas: {block.restBetween}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
-              {!isCompleted && (
+              {!isCompleted && !isRestSubstitution && (
                 <div className="flex items-center gap-3 pt-2">
                   {onClose && (
                     <button

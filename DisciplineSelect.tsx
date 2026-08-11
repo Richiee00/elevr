@@ -7,6 +7,7 @@ export type Discipline = "running" | "hyrox" | "gym" | "salud";
 interface DisciplineSelectProps {
   onSelect: (discipline: Discipline) => void;
   onBack: () => void;
+  mode?: "onboarding" | "switch";
 }
 
 const OPTIONS: Array<{ val: Discipline; title: string; desc: string; icon: React.ReactNode; enabled: boolean }> = [
@@ -40,7 +41,7 @@ const OPTIONS: Array<{ val: Discipline; title: string; desc: string; icon: React
   }
 ];
 
-export default function DisciplineSelect({ onSelect, onBack }: DisciplineSelectProps) {
+export default function DisciplineSelect({ onSelect, onBack, mode = "onboarding" }: DisciplineSelectProps) {
   return (
     <div className="w-full text-zinc-800 relative py-2 sm:py-4">
       <motion.div
@@ -54,10 +55,12 @@ export default function DisciplineSelect({ onSelect, onBack }: DisciplineSelectP
         <div>
           <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
             <Compass className="w-5 h-5 text-blue-600" />
-            1. DISCIPLINA
+            {mode === "switch" ? "CAMBIAR DE DISCIPLINA" : "1. DISCIPLINA"}
           </h3>
           <p className="text-xs text-zinc-500 font-medium leading-relaxed">
-            Selecciona qué quieres entrenar. Esto determinará el resto de tu plan personalizado.
+            {mode === "switch"
+              ? "Elige a qué disciplina quieres cambiar. Tu progreso en cada una se guarda por separado."
+              : "Selecciona qué quieres entrenar. Esto determinará el resto de tu plan personalizado."}
           </p>
         </div>
 

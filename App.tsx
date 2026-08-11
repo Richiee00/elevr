@@ -28,10 +28,10 @@ import {
 } from "lucide-react";
 
 interface AppProps {
-  onSwitchApp?: () => void;
+  onSwitchDiscipline?: () => void;
 }
 
-export default function App({ onSwitchApp }: AppProps) {
+export default function App({ onSwitchDiscipline }: AppProps) {
   const [activeTab, setActiveTab] = useState<"landing" | "onboarding" | "dashboard" | "today" | "plan" | "profile" | "calendar">("landing");
 
   const [onboarding, setOnboarding] = useState<OnboardingData | null>(null);
@@ -193,10 +193,10 @@ export default function App({ onSwitchApp }: AppProps) {
           </div>
 
           <div className="flex items-center gap-2">
-            {onSwitchApp && (
+            {onSwitchDiscipline && (
               <button
-                onClick={onSwitchApp}
-                title="Cambiar de app"
+                onClick={onSwitchDiscipline}
+                title="Cambiar de disciplina"
                 className="flex p-2.5 rounded-2xl bg-zinc-100 border border-zinc-200 text-zinc-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition cursor-pointer shadow-xs"
               >
                 <ArrowLeftRight className="w-4 h-4" />

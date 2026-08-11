@@ -27,8 +27,6 @@ import {
   Compass,
   CornerDownRight,
   ClipboardList,
-  ChevronDown,
-  ChevronUp,
   Info,
   Lock
 } from "lucide-react";
@@ -144,9 +142,6 @@ export default function TodayWorkoutView({
   const [muscleSoreness, setMuscleSoreness] = useState<number>(2);
   const [jointSoreness, setJointSoreness] = useState<number>(1);
   const [prevRpe, setPrevRpe] = useState<number>(5);
-
-  // Original workout expanded state
-  const [showOriginalPlan, setShowOriginalPlan] = useState<boolean>(false);
 
   // Completion logging states
   const [feedback, setFeedback] = useState<string>("adecuado");
@@ -996,71 +991,68 @@ export default function TodayWorkoutView({
                         </div>
                       </div>
 
-                      {/* Comparison Cards */}
+                      {/* Comparison Cards: solo si el entrenamiento realmente cambió respecto al plan original */}
+                      {sessionAdaptationResult.status === "mantener" ? (
+                        <div className="bg-emerald-50/60 border border-emerald-200 rounded-2xl p-5 flex items-center gap-3 text-left">
+                          <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+                          <p className="text-xs text-emerald-900 font-medium leading-relaxed">
+                            Tu readiness es buena hoy: se mantiene <strong>{session.name}</strong> tal y como estaba planificado, sin cambios.
+                          </p>
+                        </div>
+                      ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Original Scheduled */}
-                        <div 
-                          onClick={() => setShowOriginalPlan(!showOriginalPlan)}
-                          className="bg-white border border-zinc-200/80 rounded-2xl p-5 space-y-3 cursor-pointer select-none hover:border-zinc-300 transition-all text-left shadow-sm"
-                        >
-                          <div className="flex items-center justify-between border-b border-zinc-100 pb-2">
-                            <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider block font-sans">1. Previsto en Plan Original</span>
-                            <div className="text-zinc-400">
-                              {showOriginalPlan ? (
-                                <ChevronUp className="w-4 h-4 text-zinc-600" />
-                              ) : (
-                                <ChevronDown className="w-4 h-4 text-zinc-600" />
-                              )}
-                            </div>
+                        {/* Original Scheduled - marcado como descartado */}
+                        <div className="bg-rose-50/40 border border-rose-200 rounded-2xl p-5 space-y-3 text-left shadow-sm">
+                          <div className="flex items-center justify-between border-b border-rose-100 pb-2">
+                            <span className="text-[9px] font-bold text-rose-500 uppercase tracking-wider block font-sans">1. Previsto en Plan Original (descartado hoy)</span>
+                            <span className="text-[8px] font-bold text-white bg-rose-500 px-2 py-0.5 rounded-full uppercase tracking-wider font-mono">Cambiado</span>
                           </div>
-                          <h4 className="font-bold text-zinc-900 uppercase tracking-wider text-sm">{session.name}</h4>
-                          
-                          {showOriginalPlan && (
-                            <div className="space-y-4 pt-3 border-t border-zinc-100 text-xs text-zinc-700 font-medium">
-                              {session.intensity && (
-                                <div className="space-y-1">
-                                  <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider block font-sans">• Ritmos Planificados:</span>
-                                  <p className="text-zinc-800 pl-1 font-sans">{session.intensity}</p>
-                                </div>
-                              )}
+                          <h4 className="font-bold text-rose-700 uppercase tracking-wider text-sm line-through decoration-2">{session.name}</h4>
 
-                              {session.warmup && (
-                                <div className="space-y-1">
-                                  <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider block font-sans">• Calentamiento:</span>
-                                  <div className="space-y-1 mt-1 font-sans pl-1">
-                                    {parseWarmup(session.warmup).map((ex, exIdx) => (
-                                      <p key={exIdx} className="text-xs text-zinc-700">- {formatExercise(ex)}</p>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
+                          <div className="space-y-4 pt-3 border-t border-rose-100 text-xs text-rose-900/70 font-medium">
+                            {session.intensity && (
+                              <div className="space-y-1">
+                                <span className="text-[9px] font-bold text-rose-400 uppercase tracking-wider block font-sans">• Ritmos Planificados:</span>
+                                <p className="line-through decoration-rose-300 pl-1 font-sans">{session.intensity}</p>
+                              </div>
+                            )}
 
-                              {session.mainWork && (
-                                <div className="space-y-1">
-                                  <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider block font-sans">• Trabajo Principal:</span>
-                                  <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200/80 space-y-3 mt-1 font-sans">
-                                    {parseMainWork(session.mainWork).map((block, bIdx) => (
-                                      <div key={bIdx} className="space-y-1">
-                                        {block.title && <p className="text-[11px] font-bold text-zinc-900 uppercase">{block.title}:</p>}
-                                        <div className="space-y-0.5 pl-2 border-l border-zinc-200">
-                                          {block.exercises.map((ex, exIdx) => (
-                                            <p key={exIdx} className="text-xs text-zinc-600">- {formatExercise(ex)}</p>
-                                          ))}
-                                        </div>
+                            {session.warmup && (
+                              <div className="space-y-1">
+                                <span className="text-[9px] font-bold text-rose-400 uppercase tracking-wider block font-sans">• Calentamiento:</span>
+                                <div className="space-y-1 mt-1 font-sans pl-1">
+                                  {parseWarmup(session.warmup).map((ex, exIdx) => (
+                                    <p key={exIdx} className="text-xs line-through decoration-rose-300">- {formatExercise(ex)}</p>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {session.mainWork && (
+                              <div className="space-y-1">
+                                <span className="text-[9px] font-bold text-rose-400 uppercase tracking-wider block font-sans">• Trabajo Principal:</span>
+                                <div className="bg-white/60 p-3 rounded-xl border border-rose-200/80 space-y-3 mt-1 font-sans">
+                                  {parseMainWork(session.mainWork).map((block, bIdx) => (
+                                    <div key={bIdx} className="space-y-1">
+                                      {block.title && <p className="text-[11px] font-bold text-rose-700 uppercase line-through decoration-rose-300">{block.title}:</p>}
+                                      <div className="space-y-0.5 pl-2 border-l border-rose-200">
+                                        {block.exercises.map((ex, exIdx) => (
+                                          <p key={exIdx} className="text-xs line-through decoration-rose-300">- {formatExercise(ex)}</p>
+                                        ))}
                                       </div>
-                                    ))}
-                                  </div>
+                                    </div>
+                                  ))}
                                 </div>
-                              )}
+                              </div>
+                            )}
 
-                              {session.cooldown && (
-                                <div className="space-y-1">
-                                  <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider block font-sans">• Vuelta a la Calma:</span>
-                                  <p className="text-zinc-700 pl-1 font-sans">{session.cooldown}</p>
-                                </div>
-                              )}
-                            </div>
-                          )}
+                            {session.cooldown && (
+                              <div className="space-y-1">
+                                <span className="text-[9px] font-bold text-rose-400 uppercase tracking-wider block font-sans">• Vuelta a la Calma:</span>
+                                <p className="line-through decoration-rose-300 pl-1 font-sans">{session.cooldown}</p>
+                              </div>
+                            )}
+                          </div>
                         </div>
 
                         {/* Final Recommended */}
@@ -1133,6 +1125,7 @@ export default function TodayWorkoutView({
                           )}
                         </div>
                       </div>
+                      )}
 
                       {/* Recovery Tips */}
                       <div className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-5 space-y-2">
