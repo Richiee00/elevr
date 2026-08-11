@@ -219,7 +219,7 @@ export default function HyroxWorkoutDetail({
                 <div className="p-3 bg-rose-50/60 border border-rose-200 rounded-xl flex items-start gap-2 text-xs text-rose-900 font-medium leading-relaxed">
                   <X className="w-3.5 h-3.5 shrink-0 mt-0.5 text-rose-500" />
                   <span>
-                    Las rondas tachadas en <span className="line-through decoration-rose-400 font-bold">rojo</span> eran el plan original — hoy se han reducido según tu readiness.
+                    Las rondas en <span className="font-bold text-rose-600">rojo</span> eran el plan original — hoy se han reducido según tu readiness.
                   </span>
                 </div>
               )}
@@ -234,11 +234,11 @@ export default function HyroxWorkoutDetail({
                     </div>
                   </div>
                   <div className="pt-3 border-t border-zinc-100 space-y-2">
-                    <span className="text-[9px] font-bold text-rose-400 uppercase tracking-wider block">Plan original de hoy (descartado)</span>
-                    <p className="text-sm font-bold text-rose-700 line-through decoration-2 decoration-rose-400">{template.name}</p>
+                    <span className="text-[9px] font-bold text-rose-400 uppercase tracking-wider block">Plan Original</span>
+                    <p className="text-sm font-bold text-rose-700">{template.name}</p>
                     <div className="flex flex-wrap gap-1.5">
                       {template.blocks.map((block, bIdx) => (
-                        <span key={bIdx} className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-500 text-[10px] font-bold border border-rose-200 line-through decoration-rose-300">
+                        <span key={bIdx} className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-500 text-[10px] font-bold border border-rose-200">
                           {block.label ?? blockFormatLabel(block.format)}
                           {block.rounds && block.rounds > 1 ? ` · ${block.rounds} rondas` : ""}
                         </span>
@@ -259,7 +259,7 @@ export default function HyroxWorkoutDetail({
                             {roundsChanged ? (
                               <>
                                 {" · "}
-                                <span className="line-through decoration-rose-400 text-rose-500">{originalRounds} rondas</span>
+                                <span className="text-rose-500 font-bold">{originalRounds} rondas</span>
                                 {" → "}
                                 <span className="text-blue-700 font-black">{block.rounds} rondas</span>
                               </>

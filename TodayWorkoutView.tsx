@@ -1005,15 +1005,15 @@ export default function TodayWorkoutView({
                         <div className="bg-rose-50/40 border border-rose-200 rounded-2xl p-5 space-y-3 text-left shadow-sm">
                           <div className="flex items-center justify-between border-b border-rose-100 pb-2">
                             <span className="text-[9px] font-bold text-rose-500 uppercase tracking-wider block font-sans">1. Previsto en Plan Original (descartado hoy)</span>
-                            <span className="text-[8px] font-bold text-white bg-rose-500 px-2 py-0.5 rounded-full uppercase tracking-wider font-mono">Cambiado</span>
+                            <span className="text-[8px] font-bold text-white bg-rose-500 px-2 py-0.5 rounded-full uppercase tracking-wider font-mono">Plan Original</span>
                           </div>
-                          <h4 className="font-bold text-rose-700 uppercase tracking-wider text-sm line-through decoration-2">{session.name}</h4>
+                          <h4 className="font-bold text-rose-700 uppercase tracking-wider text-sm">{session.name}</h4>
 
                           <div className="space-y-4 pt-3 border-t border-rose-100 text-xs text-rose-900/70 font-medium">
                             {session.intensity && (
                               <div className="space-y-1">
                                 <span className="text-[9px] font-bold text-rose-400 uppercase tracking-wider block font-sans">• Ritmos Planificados:</span>
-                                <p className="line-through decoration-rose-300 pl-1 font-sans">{session.intensity}</p>
+                                <p className="pl-1 font-sans">{session.intensity}</p>
                               </div>
                             )}
 
@@ -1022,7 +1022,7 @@ export default function TodayWorkoutView({
                                 <span className="text-[9px] font-bold text-rose-400 uppercase tracking-wider block font-sans">• Calentamiento:</span>
                                 <div className="space-y-1 mt-1 font-sans pl-1">
                                   {parseWarmup(session.warmup).map((ex, exIdx) => (
-                                    <p key={exIdx} className="text-xs line-through decoration-rose-300">- {formatExercise(ex)}</p>
+                                    <p key={exIdx} className="text-xs">- {formatExercise(ex)}</p>
                                   ))}
                                 </div>
                               </div>
@@ -1034,10 +1034,10 @@ export default function TodayWorkoutView({
                                 <div className="bg-white/60 p-3 rounded-xl border border-rose-200/80 space-y-3 mt-1 font-sans">
                                   {parseMainWork(session.mainWork).map((block, bIdx) => (
                                     <div key={bIdx} className="space-y-1">
-                                      {block.title && <p className="text-[11px] font-bold text-rose-700 uppercase line-through decoration-rose-300">{block.title}:</p>}
+                                      {block.title && <p className="text-[11px] font-bold text-rose-700 uppercase">{block.title}:</p>}
                                       <div className="space-y-0.5 pl-2 border-l border-rose-200">
                                         {block.exercises.map((ex, exIdx) => (
-                                          <p key={exIdx} className="text-xs line-through decoration-rose-300">- {formatExercise(ex)}</p>
+                                          <p key={exIdx} className="text-xs">- {formatExercise(ex)}</p>
                                         ))}
                                       </div>
                                     </div>
@@ -1049,7 +1049,7 @@ export default function TodayWorkoutView({
                             {session.cooldown && (
                               <div className="space-y-1">
                                 <span className="text-[9px] font-bold text-rose-400 uppercase tracking-wider block font-sans">• Vuelta a la Calma:</span>
-                                <p className="line-through decoration-rose-300 pl-1 font-sans">{session.cooldown}</p>
+                                <p className="pl-1 font-sans">{session.cooldown}</p>
                               </div>
                             )}
                           </div>
