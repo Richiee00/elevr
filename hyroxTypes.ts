@@ -1,10 +1,10 @@
 export enum HyroxObjective {
-  PRIMERA_CARRERA = "primera_carrera",           // Preparar mi primer HYROX
-  MEJORAR_MARCA = "mejorar_marca",               // Mejorar mi marca en HYROX
-  MEJORAR_ESTACIONES = "mejorar_estaciones",     // Mejorar las estaciones funcionales
-  MEJORAR_TRANSICIONES = "mejorar_transiciones", // Mejorar las transiciones
-  VOLVER_PAUSA = "volver_pausa",                 // Volver a entrenar después de una pausa
-  BASE_GENERAL = "base_general"                  // Base de fuerza y resistencia (fuera del cerebro Hyrox)
+  PRIMERA_CARRERA = "primera_carrera",           // Objetivo 1: Preparar mi primer HYROX
+  MEJORAR_MARCA = "mejorar_marca",               // Objetivo 2: Mejorar mi marca en HYROX
+  MEJORAR_ESTACIONES = "mejorar_estaciones",     // Objetivo 3: Mejorar las estaciones funcionales
+  MEJORAR_TRANSICIONES = "mejorar_transiciones", // Objetivo 4: Mejorar las transiciones
+  VOLVER_PAUSA = "volver_pausa",                 // Objetivo 5: Volver a entrenar tras una pausa
+  BASE_GENERAL = "base_general"                  // Objetivo 6: Base de fuerza y resistencia
 }
 
 // Objetivos del cerebro que asumen que el atleta ya ha competido en Hyrox al menos una vez.
@@ -82,14 +82,27 @@ export type HyroxStation =
   | "bike_erg"
   | "general";
 
-// Limitante principal según el análisis del cerebro (Parte 1, Paso "Análisis de limitantes").
+// Agrupación de limitantes del cerebro (sección "AGRUPACIÓN DE LIMITANTES Y ESTACIONES"): 7 grupos,
+// cada uno con una o dos estaciones concretas dentro. Usado para el análisis de splits (Objetivo 2)
+// y para priorizar un máximo de dos limitantes por atleta.
 export type HyroxLimitantType =
-  | "carrera"
-  | "fuerza_maxima"
-  | "fuerza_resistencia"
-  | "transiciones"
-  | "tecnica"
+  | "carrera"             // Running
+  | "motor_aerobico"      // SkiErg, RowErg
+  | "potencia_fuerza"     // Sled Push, Sled Pull
+  | "capacidad_muscular"  // Sandbag Lunges, Wall Balls
+  | "grip_transporte"     // Farmers Carry
+  | "transiciones"        // Burpees + carrera, entradas/salidas de estación
   | "recuperacion";
+
+// Descriptor cualitativo del Objetivo 3 (Mejorar estaciones funcionales): "¿qué tipo de dificultad
+// notas más?", eje distinto de HyroxLimitantType (que identifica LA ESTACIÓN, no el tipo de dificultad).
+export type HyroxStationLimitingFactor =
+  | "fuerza"
+  | "fuerza_resistencia"
+  | "tecnica"
+  | "fatiga_muscular"
+  | "falta_estrategia"
+  | "no_lo_se";
 
 export type HyroxCategory = "carrera" | "fuerza" | "acondicionamiento" | "simulacion";
 
@@ -165,7 +178,11 @@ export interface HyroxOnboardingData {
   performance?: HyroxPerformanceData;
 
   // "Camino" cualitativo para el resto de objetivos (sin pedir splits): cada objetivo usa el subconjunto que le aplica.
+  // Solo se usa directamente para MEJORAR_TRANSICIONES ("transiciones"); para MEJORAR_ESTACIONES el/los
+  // limitante(s) reales se derivan de weakStationsSelfReported + prioridad del cerebro en detectHyroxLimitant.
   selfReportedLimitant?: HyroxLimitantType;
+  // Objetivo 3: "¿qué tipo de dificultad notas más en las estaciones?" (eje cualitativo, no de estación concreta).
+  stationLimitingFactor?: HyroxStationLimitingFactor;
   weakStationsSelfReported?: HyroxStation[];
   breakDuration?: "menos_1_mes" | "1_3_meses" | "mas_3_meses";
 
@@ -212,6 +229,10 @@ export interface HyroxTrainingPlan {
     levelEstimated: "Principiante" | "Intermedio" | "Avanzado";
     mainLimitant: string;
     limitantType?: HyroxLimitantType;
+    // Segundo limitante según la regla del cerebro: máximo dos limitantes por atleta, priorizados
+    // por la lista fija de la sección "LIMITANTES PRINCIPALES" (running siempre incluido si aparece).
+    secondaryLimitant?: string;
+    secondaryLimitantType?: HyroxLimitantType;
     strengths: string[];
     weaknesses: string[];
     bmi: number;

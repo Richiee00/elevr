@@ -150,8 +150,11 @@ export default function HyroxDashboard({ plan, activeInjury, injuryAreas, comple
             <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-4">
               <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wider mb-1">Limitante Principal</p>
               <p className="text-sm font-black text-zinc-900 leading-snug">{initialDiagnostic.mainLimitant}</p>
+              {initialDiagnostic.secondaryLimitant && (
+                <p className="text-xs text-blue-700/80 font-bold mt-1.5 leading-snug">2º limitante: {initialDiagnostic.secondaryLimitant}</p>
+              )}
               <p className="text-xs text-zinc-500 font-medium mt-2 leading-relaxed">
-                El plan priorizará esta debilidad para evitar estancamientos el día de la carrera.
+                El plan priorizará estas debilidades (máximo dos) para evitar estancamientos el día de la carrera.
               </p>
             </div>
 

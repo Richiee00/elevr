@@ -11,9 +11,11 @@ import {
   HyroxPerformanceData,
   HyroxRaceCategory,
   HyroxSessionDurationMin,
-  HyroxStation
+  HyroxStation,
+  HyroxStationLimitingFactor
 } from "./hyroxTypes";
 import { STATION_LABELS, HYROX_STATIONS_ORDER } from "./hyroxLibrary";
+import { WheelTimeInput } from "./WheelPicker";
 import {
   ArrowLeft,
   ArrowRight,
@@ -251,7 +253,7 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
   const [roxzoneTotal, setRoxzoneTotal] = useState("");
 
   // Camino cualitativo (resto de objetivos)
-  const [estacionesTipo, setEstacionesTipo] = useState<HyroxLimitantType>("fuerza_maxima");
+  const [estacionesTipo, setEstacionesTipo] = useState<HyroxStationLimitingFactor>("fuerza");
   const [breakDuration, setBreakDuration] = useState<"menos_1_mes" | "1_3_meses" | "mas_3_meses">("1_3_meses");
   const [weakStationsSelfReported, setWeakStationsSelfReported] = useState<HyroxStation[]>([]);
 
@@ -288,9 +290,11 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
       return;
     }
 
+    // El limitante real para "Mejorar estaciones" se deriva más adelante (detectHyroxLimitant) a partir
+    // de weakStationsSelfReported con la prioridad fija del cerebro; aquí solo guardamos el descriptor
+    // cualitativo (stationLimitingFactor) que el usuario reportó.
     let selfReportedLimitant: HyroxLimitantType | undefined;
     if (objective === HyroxObjective.MEJORAR_TRANSICIONES) selfReportedLimitant = "transiciones";
-    else if (objective === HyroxObjective.MEJORAR_ESTACIONES) selfReportedLimitant = estacionesTipo;
 
     const performance: HyroxPerformanceData | undefined =
       objective === HyroxObjective.MEJORAR_MARCA
@@ -315,6 +319,7 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
       sessionDurationMin,
       performance,
       selfReportedLimitant,
+      stationLimitingFactor: objective === HyroxObjective.MEJORAR_ESTACIONES ? estacionesTipo : undefined,
       weakStationsSelfReported: objective === HyroxObjective.MEJORAR_ESTACIONES ? weakStationsSelfReported : undefined,
       breakDuration: objective === HyroxObjective.VOLVER_PAUSA ? breakDuration : undefined,
       activeInjury,
@@ -490,17 +495,17 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
           )}
 
           {stepKey === "rendimiento" && (
-            <div className="space-y-5">
+            <div className="space-y-6">
               <p className="text-xs text-zinc-500 font-medium leading-relaxed">
-                Con tus tiempos reales podemos detectar tu limitante principal comparándolos con la tabla de referencia de tu categoría.
+                Con tus tiempos reales podemos detectar tu limitante principal comparándolos con la tabla de referencia de tu categoría. Desliza cada rueda hasta tu tiempo.
               </p>
-              <SegmentedTimeInput label="Tiempo total Hyrox" value={totalTime} onChange={setTotalTime} mode="hms" />
-              <div className="space-y-2">
+              <WheelTimeInput label="Tiempo total Hyrox" value={totalTime} onChange={setTotalTime} mode="hms" />
+              <div className="space-y-3">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 block">Splits de carrera (8 x 1 km)</label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-4 gap-x-2">
                   {runSplits.map((s, i) => (
                     <div key={i}>
-                      <SegmentedTimeInput
+                      <WheelTimeInput
                         label={`Km ${i + 1}`}
                         value={s}
                         onChange={v => setRunSplits(prev => prev.map((val, idx) => (idx === i ? v : val)))}
@@ -509,17 +514,17 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
                   ))}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <SegmentedTimeInput label="Ski Erg" value={skiErg} onChange={setSkiErg} />
-                <SegmentedTimeInput label="Sled Push" value={sledPush} onChange={setSledPush} />
-                <SegmentedTimeInput label="Sled Pull" value={sledPull} onChange={setSledPull} />
-                <SegmentedTimeInput label="Burpee Broad Jump" value={burpeeBroadJump} onChange={setBurpeeBroadJump} />
-                <SegmentedTimeInput label="Row" value={row} onChange={setRow} />
-                <SegmentedTimeInput label="Farmers Carry" value={farmersCarry} onChange={setFarmersCarry} />
-                <SegmentedTimeInput label="Sandbag Lunges" value={sandbagLunges} onChange={setSandbagLunges} />
-                <SegmentedTimeInput label="Wall Balls" value={wallBalls} onChange={setWallBalls} />
+              <div className="grid grid-cols-2 gap-y-4 gap-x-2">
+                <WheelTimeInput label="Ski Erg" value={skiErg} onChange={setSkiErg} />
+                <WheelTimeInput label="Sled Push" value={sledPush} onChange={setSledPush} />
+                <WheelTimeInput label="Sled Pull" value={sledPull} onChange={setSledPull} />
+                <WheelTimeInput label="Burpee Broad Jump" value={burpeeBroadJump} onChange={setBurpeeBroadJump} />
+                <WheelTimeInput label="Row" value={row} onChange={setRow} />
+                <WheelTimeInput label="Farmers Carry" value={farmersCarry} onChange={setFarmersCarry} />
+                <WheelTimeInput label="Sandbag Lunges" value={sandbagLunges} onChange={setSandbagLunges} />
+                <WheelTimeInput label="Wall Balls" value={wallBalls} onChange={setWallBalls} />
               </div>
-              <SegmentedTimeInput label="Tiempo total de transiciones (Roxzone)" value={roxzoneTotal} onChange={setRoxzoneTotal} />
+              <WheelTimeInput label="Tiempo total de transiciones (Roxzone)" value={roxzoneTotal} onChange={setRoxzoneTotal} />
             </div>
           )}
 
@@ -530,9 +535,12 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
                   <p className="text-xs text-zinc-500 font-medium leading-relaxed">¿Qué tipo de dificultad notas más en las estaciones?</p>
                   <div className="space-y-2.5">
                     {[
-                      { val: "fuerza_maxima" as HyroxLimitantType, label: "Fuerza", desc: "Sled Push/Pull o Farmers Carry se me hacen muy pesados." },
-                      { val: "fuerza_resistencia" as HyroxLimitantType, label: "Resistencia muscular", desc: "Puedo hacer la estación, pero no repetir el esfuerzo (Wall Balls, Burpees)." },
-                      { val: "tecnica" as HyroxLimitantType, label: "Técnica", desc: "Pierdo eficiencia por la forma de ejecutar el movimiento." }
+                      { val: "fuerza" as HyroxStationLimitingFactor, label: "Fuerza", desc: "Sled Push/Pull o Farmers Carry se me hacen muy pesados." },
+                      { val: "fuerza_resistencia" as HyroxStationLimitingFactor, label: "Resistencia muscular", desc: "Puedo hacer la estación, pero no repetir el esfuerzo (Wall Balls, Burpees)." },
+                      { val: "tecnica" as HyroxStationLimitingFactor, label: "Técnica", desc: "Pierdo eficiencia por la forma de ejecutar el movimiento." },
+                      { val: "fatiga_muscular" as HyroxStationLimitingFactor, label: "Fatiga muscular", desc: "Empiezo bien, pero me vengo abajo con la fatiga acumulada." },
+                      { val: "falta_estrategia" as HyroxStationLimitingFactor, label: "Falta de estrategia", desc: "No sé fraccionar bien los esfuerzos ni gestionar las pausas." },
+                      { val: "no_lo_se" as HyroxStationLimitingFactor, label: "No lo sé", desc: "No tengo claro cuál es mi mayor dificultad en estaciones." }
                     ].map(o => (
                       <button
                         key={o.val}

@@ -245,16 +245,70 @@ export function calculateHyroxTrainingZones(vamKmH: number): HyroxTrainingZone[]
 // PARTE 1 — HYROX MASTER BRAIN: BENCHMARKS Y LIMITANTES
 // ============================================================================
 
+// Agrupación de limitantes y estaciones (cerebro, sección "AGRUPACIÓN DE LIMITANTES Y ESTACIONES"):
+// Motor aeróbico = SkiErg/RowErg · Potencia y fuerza = Sled Push/Sled Pull ·
+// Capacidad muscular = Sandbag Lunges/Wall Balls · Grip y transporte = Farmers Carry ·
+// Burpee Broad Jumps se agrupa dentro de Transiciones (ver lista de prioridad, punto 5).
 const STATION_TO_LIMITANT: Record<Exclude<import("./hyroxTypes").HyroxStationParcial, "run1km" | "roxzoneTotal">, HyroxLimitantType> = {
-  skiErg: "fuerza_resistencia",
-  sledPush: "fuerza_maxima",
-  sledPull: "fuerza_maxima",
-  burpeeBroadJump: "fuerza_resistencia",
-  row: "fuerza_resistencia",
-  farmersCarry: "fuerza_maxima",
-  sandbagLunges: "fuerza_resistencia",
-  wallBalls: "fuerza_resistencia"
+  skiErg: "motor_aerobico",
+  sledPush: "potencia_fuerza",
+  sledPull: "potencia_fuerza",
+  burpeeBroadJump: "transiciones",
+  row: "motor_aerobico",
+  farmersCarry: "grip_transporte",
+  sandbagLunges: "capacidad_muscular",
+  wallBalls: "capacidad_muscular"
 };
+
+// Orden de prioridad exacto del cerebro (sección "LIMITANTES PRINCIPALES") para elegir un máximo de
+// dos limitantes por atleta. Running siempre queda incluido si aparece como limitante porque ocupa
+// la primera posición: basta con ordenar por esta lista y tomar los dos primeros presentes.
+const LIMITANT_PRIORITY_STATIONS: Array<{ key: string; type: HyroxLimitantType }> = [
+  { key: "run1km", type: "carrera" },
+  { key: "wallBalls", type: "capacidad_muscular" },
+  { key: "sandbagLunges", type: "capacidad_muscular" },
+  { key: "sledPull", type: "potencia_fuerza" },
+  { key: "burpeeBroadJump", type: "transiciones" },
+  { key: "sledPush", type: "potencia_fuerza" },
+  { key: "row", type: "motor_aerobico" },
+  { key: "skiErg", type: "motor_aerobico" },
+  { key: "farmersCarry", type: "grip_transporte" }
+];
+
+// Selecciona un máximo de dos limitantes entre las estaciones/claves detectadas como débiles,
+// respetando el orden de prioridad fijo del cerebro (running siempre entra si está presente).
+function pickTopTwoLimitantes(weakKeys: string[]): Array<{ key: string; type: HyroxLimitantType }> {
+  return LIMITANT_PRIORITY_STATIONS.filter(entry => weakKeys.includes(entry.key)).slice(0, 2);
+}
+
+// Misma agrupación que STATION_TO_LIMITANT, pero con las claves de HyroxStation (usadas en el
+// autoreporte del onboarding: "¿qué estaciones concretas te cuestan más?").
+const STATION_ENUM_TO_LIMITANT: Partial<Record<HyroxStation, HyroxLimitantType>> = {
+  run: "carrera",
+  ski_erg: "motor_aerobico",
+  row_erg: "motor_aerobico",
+  sled_push: "potencia_fuerza",
+  sled_pull: "potencia_fuerza",
+  sandbag_lunges: "capacidad_muscular",
+  wall_balls: "capacidad_muscular",
+  farmers_carry: "grip_transporte",
+  burpee_broad_jump: "transiciones",
+  bike_erg: "motor_aerobico"
+};
+
+const LIMITANT_PRIORITY_HYROX_STATIONS: HyroxStation[] = [
+  "run", "wall_balls", "sandbag_lunges", "sled_pull", "burpee_broad_jump", "sled_push", "row_erg", "ski_erg", "farmers_carry"
+];
+
+// Máximo dos limitantes a partir de las estaciones autoreportadas por el usuario (Objetivo 3),
+// con la misma prioridad fija del cerebro.
+function pickTopTwoLimitantesFromStations(weakStations: HyroxStation[]): Array<{ station: HyroxStation; type: HyroxLimitantType }> {
+  return LIMITANT_PRIORITY_HYROX_STATIONS
+    .filter(s => weakStations.includes(s))
+    .map(s => ({ station: s, type: STATION_ENUM_TO_LIMITANT[s]! }))
+    .filter(entry => !!entry.type)
+    .slice(0, 2);
+}
 
 function nearestBandIndex(actualSeconds: number, row: Record<HyroxBenchmarkBand, string>): number {
   let bestIdx = BAND_ORDER.length - 1;
@@ -274,6 +328,8 @@ export interface HyroxBenchmarkAnalysis {
   levelBand: HyroxBenchmarkBand;
   mainLimitant: HyroxLimitantType;
   mainLimitantStation: string;
+  secondaryLimitant?: HyroxLimitantType;
+  secondaryLimitantStation?: string;
   worstGapSeconds: number;
   strengths: string[];
   weaknesses: string[];
@@ -309,37 +365,38 @@ export function analyzeHyroxPerformance(category: HyroxRaceCategory, performance
     ? indexValues.slice().sort((a, b) => a - b)[Math.floor(indexValues.length / 2)]
     : 3;
 
-  // El limitante principal es la estación con peor banda relativa al resto (mayor índice = más lenta).
-  let worstKey = "";
-  let worstIdx = -1;
-  Object.entries(bandIndexes).forEach(([key, idx]) => {
-    if (key !== "roxzoneTotal" && idx > worstIdx) {
-      worstIdx = idx;
-      worstKey = key;
-    }
-  });
-
+  // Estaciones "débiles": banda peor que la mediana propia del atleta. La roxzone (transiciones) se
+  // añade como clave "burpeeBroadJump" débil si su gap es grande, ya que el cerebro agrupa transiciones
+  // ahí; el resto de estaciones débiles se evalúan directamente contra STATION_TO_LIMITANT.
   const roxzoneGapIdx = bandIndexes["roxzoneTotal"] ?? medianIndex;
-  const mainLimitant: HyroxLimitantType =
-    roxzoneGapIdx > medianIndex + 1
-      ? "transiciones"
-      : worstKey === "run1km"
-      ? "carrera"
-      : (STATION_TO_LIMITANT as any)[worstKey] ?? "carrera";
+  const weakKeys = Object.entries(bandIndexes)
+    .filter(([key, idx]) => key !== "roxzoneTotal" && idx > medianIndex)
+    .map(([key]) => key);
+  if (roxzoneGapIdx > medianIndex + 1 && !weakKeys.includes("burpeeBroadJump")) {
+    weakKeys.push("burpeeBroadJump");
+  }
+
+  // Máximo dos limitantes, en el orden de prioridad fijo del cerebro (running siempre entra si está presente).
+  const topTwo = pickTopTwoLimitantes(weakKeys.length > 0 ? weakKeys : Object.keys(bandIndexes).filter(k => k !== "roxzoneTotal"));
+  const worstKey = topTwo[0]?.key ?? "";
+  const mainLimitant: HyroxLimitantType = topTwo[0]?.type ?? "carrera";
+  const secondaryLimitant = topTwo[1]?.type;
+  const secondaryLimitantStation = topTwo[1]?.key;
+  const worstIdx = worstKey ? bandIndexes[worstKey] ?? -1 : -1;
 
   const strengths = Object.entries(bandIndexes)
     .filter(([key, idx]) => key !== "roxzoneTotal" && idx < medianIndex)
     .map(([key]) => key);
-  const weaknesses = Object.entries(bandIndexes)
-    .filter(([key, idx]) => key !== "roxzoneTotal" && idx > medianIndex)
-    .map(([key]) => key);
+  const weaknesses = weakKeys;
 
   return {
     levelBandIndex: medianIndex,
     levelBand: BAND_ORDER[medianIndex],
     mainLimitant,
     mainLimitantStation: worstKey,
-    worstGapSeconds: worstIdx >= 0 ? Math.abs(parcialSeconds[worstKey] - parseTimeToSeconds((benchmarkRow as any)[worstKey][BAND_ORDER[medianIndex]])) : 0,
+    secondaryLimitant,
+    secondaryLimitantStation,
+    worstGapSeconds: worstIdx >= 0 && worstKey !== "burpeeBroadJump" ? Math.abs(parcialSeconds[worstKey] - parseTimeToSeconds((benchmarkRow as any)[worstKey][BAND_ORDER[medianIndex]])) : 0,
     strengths,
     weaknesses
   };
@@ -374,6 +431,8 @@ export function detectHyroxLimitant(data: HyroxOnboardingData): {
   levelEstimated: "Principiante" | "Intermedio" | "Avanzado";
   mainLimitant: string;
   limitantType?: HyroxLimitantType;
+  secondaryLimitant?: string;
+  secondaryLimitantType?: HyroxLimitantType;
   strengths: string[];
   weaknesses: string[];
 } {
@@ -390,6 +449,8 @@ export function detectHyroxLimitant(data: HyroxOnboardingData): {
       levelEstimated,
       mainLimitant: `${STATION_LIMITANT_LABEL[analysis.mainLimitant]} (estación de referencia: ${analysis.mainLimitantStation})`,
       limitantType: analysis.mainLimitant,
+      secondaryLimitant: analysis.secondaryLimitant ? `${STATION_LIMITANT_LABEL[analysis.secondaryLimitant]} (estación de referencia: ${analysis.secondaryLimitantStation})` : undefined,
+      secondaryLimitantType: analysis.secondaryLimitant,
       strengths: analysis.strengths,
       weaknesses: analysis.weaknesses
     };
@@ -401,6 +462,34 @@ export function detectHyroxLimitant(data: HyroxOnboardingData): {
       mainLimitant: "Sin especialización: prioridad en técnica, resistencia y fuerza general con progresión gradual.",
       strengths: [],
       weaknesses: []
+    };
+  }
+
+  // Objetivo 3 (Mejorar estaciones funcionales): el limitante real se deriva de las estaciones
+  // concretas autoreportadas ("¿qué estaciones te cuestan más?"), no del descriptor cualitativo
+  // (stationLimitingFactor solo aporta contexto de texto: fuerza / técnica / fatiga muscular...).
+  if (data.objective === HyroxObjective.MEJORAR_ESTACIONES) {
+    const weakStations = data.weakStationsSelfReported ?? [];
+    const topTwo = pickTopTwoLimitantesFromStations(weakStations);
+    const factorLabel = data.stationLimitingFactor ? STATION_LIMITING_FACTOR_LABEL[data.stationLimitingFactor] : undefined;
+
+    if (topTwo.length > 0) {
+      return {
+        levelEstimated,
+        mainLimitant: `${STATION_LIMITANT_LABEL[topTwo[0].type]} (${STATION_LABEL_BY_ENUM[topTwo[0].station]})${factorLabel ? ` — ${factorLabel}` : ""}`,
+        limitantType: topTwo[0].type,
+        secondaryLimitant: topTwo[1] ? `${STATION_LIMITANT_LABEL[topTwo[1].type]} (${STATION_LABEL_BY_ENUM[topTwo[1].station]})` : undefined,
+        secondaryLimitantType: topTwo[1]?.type,
+        strengths: [],
+        weaknesses: weakStations
+      };
+    }
+
+    return {
+      levelEstimated,
+      mainLimitant: factorLabel ?? "Enfoque equilibrado en estaciones: sin estación concreta reportada.",
+      strengths: [],
+      weaknesses: weakStations
     };
   }
 
@@ -424,11 +513,35 @@ export function detectHyroxLimitant(data: HyroxOnboardingData): {
 
 const STATION_LIMITANT_LABEL: Record<HyroxLimitantType, string> = {
   carrera: "Carrera",
-  fuerza_maxima: "Fuerza máxima",
-  fuerza_resistencia: "Fuerza-resistencia",
+  motor_aerobico: "Motor aeróbico (SkiErg / RowErg)",
+  potencia_fuerza: "Potencia y fuerza (Sled Push / Sled Pull)",
+  capacidad_muscular: "Capacidad muscular (Sandbag Lunges / Wall Balls)",
+  grip_transporte: "Grip y transporte (Farmers Carry)",
   transiciones: "Transiciones",
-  tecnica: "Técnica",
   recuperacion: "Recuperación / tolerancia a la carga"
+};
+
+const STATION_LIMITING_FACTOR_LABEL: Record<import("./hyroxTypes").HyroxStationLimitingFactor, string> = {
+  fuerza: "Fuerza",
+  fuerza_resistencia: "Resistencia muscular",
+  tecnica: "Técnica",
+  fatiga_muscular: "Fatiga muscular",
+  falta_estrategia: "Falta de estrategia de fraccionamiento",
+  no_lo_se: "Sin limitante claro identificado"
+};
+
+const STATION_LABEL_BY_ENUM: Record<HyroxStation, string> = {
+  run: "Carrera",
+  ski_erg: "SkiErg",
+  sled_push: "Sled Push",
+  sled_pull: "Sled Pull",
+  burpee_broad_jump: "Burpee Broad Jumps",
+  row_erg: "RowErg",
+  farmers_carry: "Farmers Carry",
+  sandbag_lunges: "Sandbag Lunges",
+  wall_balls: "Wall Balls",
+  bike_erg: "Bike Erg",
+  general: "General"
 };
 
 // ============================================================================
@@ -477,12 +590,24 @@ function templateFitsGymType(template: HyroxWorkoutTemplate, gymType: HyroxOnboa
   return !template.equipment.includes("sled_push") && !template.equipment.includes("sled_pull");
 }
 
+// Estaciones objetivo por grupo de limitante (cerebro, "AGRUPACIÓN DE LIMITANTES Y ESTACIONES").
+const TARGET_STATIONS_BY_LIMITANT: Record<HyroxLimitantType, HyroxStation[]> = {
+  carrera: ["run"],
+  motor_aerobico: ["ski_erg", "row_erg"],
+  potencia_fuerza: ["sled_push", "sled_pull"],
+  capacidad_muscular: ["sandbag_lunges", "wall_balls"],
+  grip_transporte: ["farmers_carry"],
+  transiciones: ["run", "burpee_broad_jump"],
+  recuperacion: []
+};
+
 function pickTemplate(
   category: "carrera" | "fuerza" | "acondicionamiento" | "simulacion",
   data: HyroxOnboardingData,
   isDescarga: boolean,
   usedIds: Set<string>,
-  limitant?: HyroxLimitantType
+  limitant?: HyroxLimitantType,
+  secondaryLimitant?: HyroxLimitantType
 ): HyroxWorkoutTemplate {
   let candidates = HYROX_WORKOUT_LIBRARY.filter(t => t.category === category && templateFitsGymType(t, data.gymType));
   if (candidates.length === 0) candidates = HYROX_WORKOUT_LIBRARY.filter(t => t.category === category);
@@ -496,16 +621,13 @@ function pickTemplate(
   const pool = unused.length > 0 ? unused : candidates;
 
   if (limitant) {
-    const targetStationsForLimitant: HyroxStation[] =
-      limitant === "carrera" ? ["run"]
-      : limitant === "fuerza_maxima" ? ["sled_push", "sled_pull", "farmers_carry"]
-      : limitant === "fuerza_resistencia" ? ["wall_balls", "burpee_broad_jump", "sandbag_lunges", "row_erg", "ski_erg"]
-      : limitant === "transiciones" ? ["run"]
-      : [];
+    // El limitante principal cuenta doble frente al secundario al puntuar cada plantilla.
+    const primaryStations = TARGET_STATIONS_BY_LIMITANT[limitant] ?? [];
+    const secondaryStations = secondaryLimitant ? TARGET_STATIONS_BY_LIMITANT[secondaryLimitant] ?? [] : [];
     const sorted = [...pool].sort(
       (a, b) =>
-        b.targetStations.filter(s => targetStationsForLimitant.includes(s)).length -
-        a.targetStations.filter(s => targetStationsForLimitant.includes(s)).length
+        (b.targetStations.filter(s => primaryStations.includes(s)).length * 2 + b.targetStations.filter(s => secondaryStations.includes(s)).length) -
+        (a.targetStations.filter(s => primaryStations.includes(s)).length * 2 + a.targetStations.filter(s => secondaryStations.includes(s)).length)
     );
     return sorted[0] ?? candidates[0];
   }
@@ -563,7 +685,7 @@ export function generateHyroxPlan(data: HyroxOnboardingData): HyroxTrainingPlan 
 
       const template = isRaceWeek && slot === dayIndexes.length - 1
         ? getTemplateById("half-hyrox-simulation") ?? pickTemplate("simulacion", data, true, usedIdsThisWeek)
-        : pickTemplate(category, data, isDescarga || isRaceWeek, usedIdsThisWeek, limitantInfo.limitantType);
+        : pickTemplate(category, data, isDescarga || isRaceWeek, usedIdsThisWeek, limitantInfo.limitantType, limitantInfo.secondaryLimitantType);
 
       usedIdsThisWeek.add(template.id);
       sessionCounter++;
@@ -601,6 +723,8 @@ export function generateHyroxPlan(data: HyroxOnboardingData): HyroxTrainingPlan 
       levelEstimated: limitantInfo.levelEstimated,
       mainLimitant: limitantInfo.mainLimitant,
       limitantType: limitantInfo.limitantType,
+      secondaryLimitant: limitantInfo.secondaryLimitant,
+      secondaryLimitantType: limitantInfo.secondaryLimitantType,
       strengths: limitantInfo.strengths,
       weaknesses: limitantInfo.weaknesses,
       bmi,
