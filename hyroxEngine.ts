@@ -402,7 +402,20 @@ export function analyzeHyroxPerformance(category: HyroxRaceCategory, performance
   };
 }
 
-export function estimateHyroxFinishTime(data: HyroxOnboardingData): { conservador: string; realista: string; agresivo?: string } {
+// Factores de fatiga por carrera del cerebro (HYROX RUNNING PREDICTION ENGINE): 0.98 la carrera 1
+// hasta 1.07 la carrera 8, aplicados sobre el ritmo de zona para simular las 8 x 1 km reales.
+const HYROX_RACE_FATIGUE_FACTORS = [0.98, 1.0, 1.01, 1.02, 1.03, 1.04, 1.05, 1.07];
+
+// Ritmo umbral estimado a partir del Test VAM: el cerebro lista "Test VAM" como método válido
+// para calcular el ritmo umbral (misma convención que el módulo de running: ~85% de la velocidad VAM).
+function estimateHyroxRunningSecondsFromVAM(vamKmH: number, zoneOffsetSecPerKm: number): number {
+  if (vamKmH <= 0) return 0;
+  const thresholdPaceSecPerKm = 3600 / vamKmH / 0.85;
+  const zonePaceSecPerKm = Math.max(120, thresholdPaceSecPerKm + zoneOffsetSecPerKm);
+  return HYROX_RACE_FATIGUE_FACTORS.reduce((sum, f) => sum + zonePaceSecPerKm * f, 0);
+}
+
+export function estimateHyroxFinishTime(data: HyroxOnboardingData, vamKmH?: number): { conservador: string; realista: string; agresivo?: string } {
   if (data.objective === HyroxObjective.PRIMERA_CARRERA) {
     const [min, max] = HYROX_DEBUTANTE_RANGE[data.raceCategory];
     return { conservador: max, realista: formatSecondsToTime((parseTimeToSeconds(min) + parseTimeToSeconds(max)) / 2), agresivo: min };
@@ -420,7 +433,21 @@ export function estimateHyroxFinishTime(data: HyroxOnboardingData): { conservado
     };
   }
 
-  // Resto de objetivos: sin datos de carrera, estimación conservadora genérica por división.
+  // Estación + transiciones: sin splits reales, usamos una constante genérica ajustada por división
+  // (independiente del VAM, que solo afecta a la parte de carrera).
+  const stationTransitionSeconds = data.division === HyroxDivision.PRO ? 2700 : data.division === HyroxDivision.DOUBLES ? 2100 : 2400;
+
+  // Resto de objetivos: si hay Test VAM, estimamos el tiempo de carrera real con las zonas HYROX del
+  // cerebro (Z1 conservador, Z2 realista, Z3 agresivo) en vez de un total genérico fijo por división.
+  if (vamKmH && vamKmH > 0) {
+    return {
+      conservador: formatSecondsToTime(estimateHyroxRunningSecondsFromVAM(vamKmH, 35) + stationTransitionSeconds),
+      realista: formatSecondsToTime(estimateHyroxRunningSecondsFromVAM(vamKmH, 17) + stationTransitionSeconds),
+      agresivo: formatSecondsToTime(estimateHyroxRunningSecondsFromVAM(vamKmH, 2) + stationTransitionSeconds)
+    };
+  }
+
+  // Sin datos de carrera ni Test VAM: estimación conservadora genérica por división.
   let baseSeconds = 6000;
   if (data.division === HyroxDivision.PRO) baseSeconds += 900;
   if (data.division === HyroxDivision.DOUBLES) baseSeconds -= 600;

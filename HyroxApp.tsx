@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { HyroxOnboardingData, HyroxTrainingPlan, HyroxVAMTestResult } from "./hyroxTypes";
-import { HyroxDailyInput, generateHyroxPlan } from "./hyroxEngine";
+import { HyroxDailyInput, generateHyroxPlan, estimateHyroxFinishTime } from "./hyroxEngine";
 
 import HyroxLanding from "./HyroxLanding";
 import HyroxOnboarding from "./HyroxOnboarding";
@@ -101,6 +101,20 @@ export default function HyroxApp({ onSwitchDiscipline }: HyroxAppProps) {
   const handleSaveVAMTest = (result: HyroxVAMTestResult) => {
     setVamTest(result);
     localStorage.setItem("hyrox_plan_vam_test", JSON.stringify(result));
+
+    // Recalcula el tiempo objetivo del dashboard con el ritmo real del Test VAM (para objetivos sin
+    // splits reales ni tabla de debutante, estimateHyroxFinishTime ya prioriza esos datos por encima del VAM).
+    if (plan && onboarding) {
+      const updatedPlan = {
+        ...plan,
+        initialDiagnostic: {
+          ...plan.initialDiagnostic,
+          estimatedFinishTime: estimateHyroxFinishTime(onboarding, result.vamKmH)
+        }
+      };
+      setPlan(updatedPlan);
+      localStorage.setItem("hyrox_plan_data", JSON.stringify(updatedPlan));
+    }
   };
 
   const handleResetAll = () => {
