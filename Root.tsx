@@ -19,21 +19,12 @@ type Stage =
   | "app-running"
   | "app-hyrox";
 
-function resolveBootStage(): Stage {
-  try {
-    const activeApp = localStorage.getItem("elevr_active_app");
-    if (activeApp === "running" && localStorage.getItem("run_plan_data")) return "app-running";
-    if (activeApp === "hyrox" && localStorage.getItem("hyrox_plan_data")) return "app-hyrox";
-    if (localStorage.getItem("hyrox_plan_data")) return "app-hyrox";
-    if (localStorage.getItem("run_plan_data")) return "app-running";
-  } catch (e) {
-    console.error("Error resolving boot stage:", e);
-  }
-  return "landing";
-}
-
 export default function Root() {
-  const [stage, setStage] = useState<Stage>(() => resolveBootStage());
+  // La app siempre arranca en la pantalla de bienvenida de ELEVR, con el selector de disciplina
+  // como paso siguiente — nunca se salta directamente a Running o Hyrox aunque ya exista un plan
+  // guardado. Quien vuelve con un plan ya creado tiene el botón "Ir directo a mi plan existente"
+  // en esa pantalla de bienvenida como atajo deliberado, en vez de un salto automático y silencioso.
+  const [stage, setStage] = useState<Stage>("landing");
   // Recuerda desde qué disciplina se abrió el selector cuando se usa como "cambiar de disciplina"
   // en vez de como el primer paso del onboarding, para poder volver directamente a ella con "Atrás".
   const [switchOrigin, setSwitchOrigin] = useState<Stage | null>(null);
@@ -81,8 +72,13 @@ export default function Root() {
     setStage("discipline");
   };
 
-  if (stage === "app-running") return <App onSwitchDiscipline={handleSwitchDiscipline} />;
-  if (stage === "app-hyrox") return <HyroxApp onSwitchDiscipline={handleSwitchDiscipline} />;
+  const handleResetToLanding = () => {
+    setSwitchOrigin(null);
+    setStage("landing");
+  };
+
+  if (stage === "app-running") return <App onSwitchDiscipline={handleSwitchDiscipline} onResetToLanding={handleResetToLanding} />;
+  if (stage === "app-hyrox") return <HyroxApp onSwitchDiscipline={handleSwitchDiscipline} onResetToLanding={handleResetToLanding} />;
 
   const hasAnyPlan = !!localStorage.getItem("run_plan_data") || !!localStorage.getItem("hyrox_plan_data");
 

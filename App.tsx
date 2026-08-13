@@ -8,8 +8,6 @@ import {
 import { generateTrainingPlan } from "./engines";
 
 // View components
-import Landing from "./Landing";
-import Onboarding from "./Onboarding";
 import Dashboard from "./Dashboard";
 import WeeklyPlanView from "./WeeklyPlanView";
 import TodayWorkoutView from "./TodayWorkoutView";
@@ -29,39 +27,32 @@ import {
 
 interface AppProps {
   onSwitchDiscipline?: () => void;
+  onResetToLanding: () => void;
 }
 
-export default function App({ onSwitchDiscipline }: AppProps) {
-  const [activeTab, setActiveTab] = useState<"landing" | "onboarding" | "dashboard" | "today" | "plan" | "profile" | "calendar">("landing");
+function loadJSON<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (e) {
+    console.error(`Error loading localStorage key "${key}":`, e);
+    return fallback;
+  }
+}
 
-  const [onboarding, setOnboarding] = useState<OnboardingData | null>(null);
-  const [plan, setPlan] = useState<TrainingPlan | null>(null);
-  const [currentWeekIndex, setCurrentWeekIndex] = useState<number>(0);
-  const [readinessHistory, setReadinessHistory] = useState<Record<string, DailyReadinessInput>>({});
-  const [completedWorkouts, setCompletedWorkouts] = useState<Record<string, { feedback: string; rpe: number; date: string }>>({});
+export default function App({ onSwitchDiscipline, onResetToLanding }: AppProps) {
+  // Root.tsx solo monta App cuando ya existe un plan de running guardado, así que este componente
+  // no necesita sus propias pantallas de landing/onboarding: se inicializa directamente con los
+  // datos persistidos (lazy init, sin useEffect posterior) para no mostrar ningún flash intermedio.
+  const [activeTab, setActiveTab] = useState<"dashboard" | "today" | "plan" | "profile" | "calendar">("today");
 
-  useEffect(() => {
-    try {
-      const savedOnboarding = localStorage.getItem("run_plan_onboarding");
-      const savedPlan = localStorage.getItem("run_plan_data");
-      const savedWeekIdx = localStorage.getItem("run_plan_current_week");
-      const savedReadiness = localStorage.getItem("run_plan_readiness");
-      const savedCompleted = localStorage.getItem("run_plan_completed_workouts");
-
-      if (savedOnboarding) setOnboarding(JSON.parse(savedOnboarding));
-
-      if (savedPlan) {
-        setPlan(JSON.parse(savedPlan));
-        setActiveTab("today");
-      }
-
-      if (savedWeekIdx) setCurrentWeekIndex(Number(savedWeekIdx));
-      if (savedReadiness) setReadinessHistory(JSON.parse(savedReadiness));
-      if (savedCompleted) setCompletedWorkouts(JSON.parse(savedCompleted));
-    } catch (e) {
-      console.error("Error loading localStorage running plan states:", e);
-    }
-  }, []);
+  const [onboarding, setOnboarding] = useState<OnboardingData | null>(() => loadJSON("run_plan_onboarding", null));
+  const [plan, setPlan] = useState<TrainingPlan | null>(() => loadJSON("run_plan_data", null));
+  const [currentWeekIndex, setCurrentWeekIndex] = useState<number>(() => Number(localStorage.getItem("run_plan_current_week") || "0"));
+  const [readinessHistory, setReadinessHistory] = useState<Record<string, DailyReadinessInput>>(() => loadJSON("run_plan_readiness", {}));
+  const [completedWorkouts, setCompletedWorkouts] = useState<Record<string, { feedback: string; rpe: number; date: string }>>(() =>
+    loadJSON("run_plan_completed_workouts", {})
+  );
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -70,19 +61,6 @@ export default function App({ onSwitchDiscipline }: AppProps) {
   const handleSetCurrentWeekIndex = (idx: number) => {
     setCurrentWeekIndex(idx);
     localStorage.setItem("run_plan_current_week", String(idx));
-  };
-
-  const handleCompleteOnboarding = (data: OnboardingData) => {
-    const newPlan = generateTrainingPlan(data);
-
-    setOnboarding(data);
-    setPlan(newPlan);
-    setCurrentWeekIndex(0);
-    setActiveTab("dashboard");
-
-    localStorage.setItem("run_plan_onboarding", JSON.stringify(data));
-    localStorage.setItem("run_plan_data", JSON.stringify(newPlan));
-    localStorage.setItem("run_plan_current_week", "0");
   };
 
   const handleUpdateProfile = (data: OnboardingData) => {
@@ -124,18 +102,12 @@ export default function App({ onSwitchDiscipline }: AppProps) {
   };
 
   const handleResetAll = () => {
-    setOnboarding(null);
-    setPlan(null);
-    setCurrentWeekIndex(0);
-    setReadinessHistory({});
-    setCompletedWorkouts({});
-    setActiveTab("landing");
-
     localStorage.removeItem("run_plan_onboarding");
     localStorage.removeItem("run_plan_data");
     localStorage.removeItem("run_plan_current_week");
     localStorage.removeItem("run_plan_readiness");
     localStorage.removeItem("run_plan_completed_workouts");
+    onResetToLanding();
   };
 
   const todayKey = new Date().toISOString().split("T")[0];
@@ -150,11 +122,10 @@ export default function App({ onSwitchDiscipline }: AppProps) {
 
   return (
     <div className="min-h-screen bg-[#F4F5F7] text-zinc-900 flex flex-col font-sans select-none antialiased">
-      {activeTab !== "landing" && (
-        <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-zinc-200/80 px-4 sm:px-8 py-3.5 shadow-2xs">
+      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-zinc-200/80 px-4 sm:px-8 py-3.5 shadow-2xs">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div
-            onClick={() => setActiveTab(plan ? "today" : "landing")}
+            onClick={() => setActiveTab("today")}
             className="flex items-center gap-3 cursor-pointer hover:opacity-90 transition group"
           >
             <div className="p-2 bg-black rounded-xl text-white shadow-sm shrink-0 flex items-center justify-center group-hover:scale-105 transition-transform">
@@ -215,41 +186,9 @@ export default function App({ onSwitchDiscipline }: AppProps) {
           </div>
         </div>
       </header>
-      )}
 
       <main className={`flex-1 px-4 sm:px-8 py-6 max-w-7xl w-full mx-auto relative ${plan ? "pb-28" : ""}`}>
         <AnimatePresence mode="wait">
-          {activeTab === "landing" && (
-            <motion.div
-              key="landing"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <Landing
-                onStartOnboarding={() => setActiveTab("onboarding")}
-                hasPlan={!!plan}
-                onGoToDashboard={() => setActiveTab("today")}
-              />
-            </motion.div>
-          )}
-
-          {activeTab === "onboarding" && (
-            <motion.div
-              key="onboarding"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <Onboarding
-                onComplete={handleCompleteOnboarding}
-                onCancel={() => setActiveTab(plan ? "today" : "landing")}
-              />
-            </motion.div>
-          )}
-
           {activeTab === "dashboard" && plan && (
             <motion.div
               key="dashboard"
