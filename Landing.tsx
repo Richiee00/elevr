@@ -109,7 +109,7 @@ export default function Landing({ onStartOnboarding, hasPlan, onGoToDashboard }:
             {/* Tarjeta Informativa del Punto Intermedio: compacta en una sola tarjeta */}
             <div className="bg-white border border-zinc-200/80 rounded-3xl p-6 shadow-xs w-full space-y-4 text-left">
               <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-zinc-900 font-sans border-b border-zinc-100 pb-2.5">
-                ¿POR QUÉ SOMOS ÚNICOS?
+                ¿POR QUÉ ELEVR ES ÚNICO?
               </h3>
 
               <div className="bg-zinc-50/80 rounded-2xl p-4 border border-zinc-100 divide-y divide-zinc-200/60 font-sans">
@@ -141,7 +141,7 @@ export default function Landing({ onStartOnboarding, hasPlan, onGoToDashboard }:
                 <div className="py-3 flex items-start gap-3">
                   <span className="text-sm font-bold text-blue-600 shrink-0 leading-none mt-0.5">3.</span>
                   <div>
-                    <h4 className="text-xs sm:text-sm font-bold text-zinc-900">Tú solo preocúpate de correr</h4>
+                    <h4 className="text-xs sm:text-sm font-bold text-zinc-900">Tú solo preocúpate de entrenar</h4>
                     <p className="text-xs text-zinc-500 leading-relaxed font-medium mt-0.5">
                       Adaptamos el plan a lo que tu cuerpo necesita
                     </p>

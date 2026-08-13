@@ -171,10 +171,11 @@ export default function HyroxApp({ onSwitchDiscipline }: HyroxAppProps) {
             <div className="flex items-center gap-2">
               <button
                 onClick={onSwitchDiscipline}
-                title="Cambiar de disciplina"
-                className="flex p-2.5 rounded-2xl bg-zinc-100 border border-zinc-200 text-zinc-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition cursor-pointer shadow-xs"
+                title="Cambiar plan"
+                className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl bg-zinc-100 border border-zinc-200 text-zinc-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition cursor-pointer shadow-xs"
               >
                 <ArrowLeftRight className="w-4 h-4" />
+                <span className="text-[10px] font-bold uppercase tracking-wider">Cambiar Plan</span>
               </button>
               {plan && (
                 <button
@@ -266,7 +267,7 @@ export default function HyroxApp({ onSwitchDiscipline }: HyroxAppProps) {
               <div className={`p-2 rounded-full transition-all duration-200 ${activeTab === "today" ? "bg-black text-white shadow-md scale-105" : "hover:bg-zinc-100"}`}>
                 <Flame className="w-4 h-4" />
               </div>
-              <span className="text-[9px]">Entrenar</span>
+              <span className="text-[9px]">Hoy</span>
             </button>
 
             <button onClick={() => setActiveTab("dashboard")} className={bottomNavButtonClass("dashboard")}>

@@ -262,9 +262,10 @@ export default function TodayWorkoutView({
 
   // Default selection is today's workout
   const defaultWorkout = activeWeek.sessions[dayIndex] || activeWeek.sessions[0];
-  
-  // State for expanded/selected session ID (defaults to empty string to show list first)
-  const [selectedSessionId, setSelectedSessionId] = useState<string>("");
+
+  // La pestaña "Hoy" siempre abre directamente el entrenamiento del día correspondiente en el plan;
+  // las flechas de navegación permiten hojear los demás días de la semana sin pasar por una lista.
+  const [selectedSessionId, setSelectedSessionId] = useState<string>(defaultWorkout.id);
 
   const hasLoggedReadiness = !!readiness;
 
@@ -307,163 +308,23 @@ export default function TodayWorkoutView({
     }
   };
 
-  if (!selectedSessionId) {
-    return (
-      <div className="max-w-4xl mx-auto pb-12 space-y-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-200/80 pb-4">
-          <div>
-            <h2 className="text-2xl font-black italic uppercase tracking-tight text-zinc-900 mt-1">
-              Entrenamiento de Hoy
-            </h2>
-            <p className="text-xs text-zinc-500 font-medium mt-1">
-              Selecciona la sesión que deseas realizar. Adaptaremos sus bloques y ritmos al instante según tus sensaciones corporales.
-            </p>
-          </div>
-          <div className="px-4 py-2 bg-white border border-zinc-200/80 text-zinc-700 font-bold text-xs uppercase tracking-wider rounded-xl font-mono shrink-0 shadow-sm">
-            {new Date().toLocaleDateString("es-ES", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
-          </div>
-        </div>
-
-        {/* Status Banner */}
-        {todayCompleted.length > 0 && (
-          <div className={`p-4 rounded-xl border flex items-start gap-3 text-xs leading-relaxed text-left ${
-            todayCompleted.length === 1 && todayCompleted[0].rpe < 3 && (todayCompleted[0].type === "fuerza" || todayCompleted[0].type === "carrera")
-              ? "bg-blue-50/80 border-blue-200 text-blue-900"
-              : "bg-rose-50 border-rose-200 text-rose-900"
-          }`}>
-            {todayCompleted.length === 1 && todayCompleted[0].rpe < 3 && (todayCompleted[0].type === "fuerza" || todayCompleted[0].type === "carrera") ? (
-              <>
-                <Zap className="w-5 h-5 shrink-0 mt-0.5 text-blue-600 animate-pulse" />
-                <div>
-                  <span className="font-bold uppercase tracking-wider block mb-0.5 text-blue-600">Doble Sesión Permitida Excepcionalmente</span>
-                  <p className="font-medium text-zinc-700">
-                    Has completado tu sesión de <strong className="text-blue-600">{todayCompleted[0].type === "fuerza" ? "Fuerza" : "Carrera"}</strong> hoy con un esfuerzo muy bajo (RPE {todayCompleted[0].rpe}/10). Por lo tanto, hoy puedes realizar también tu sesión de <strong className="text-blue-600">{todayCompleted[0].type === "fuerza" ? "carrera" : "fuerza"}</strong>.
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5 text-rose-600" />
-                <div>
-                  <span className="font-bold uppercase tracking-wider block mb-0.5 text-rose-600">Límite Diario Alcanzado / Sesiones Bloqueadas</span>
-                  <p className="font-medium text-zinc-700">
-                    {todayCompleted.length >= 2 ? (
-                      `¡Excelente trabajo! Has completado el límite máximo de 2 entrenamientos para hoy. Descansa y recupérate para asimilar las cargas de entrenamiento.`
-                    ) : (
-                      `Ya has completado una sesión de ${todayCompleted[0].type === "fuerza" ? "Fuerza" : todayCompleted[0].type === "carrera" ? "Carrera" : todayCompleted[0].type || "entrenamiento"} hoy con un RPE de ${todayCompleted[0].rpe}/10 (igual o superior a 3). Las demás sesiones de fuerza y carrera han sido bloqueadas hasta mañana para evitar el sobreentrenamiento y prevenir lesiones.`
-                    )}
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Sessions Grid / List */}
-        <div className="space-y-4">
-          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block font-sans">
-            Tus sesiones programadas para esta semana
-          </span>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {activeWeek.sessions.map((session, idx) => {
-              const isCompleted = !!completedWorkouts[session.id];
-              const dayName = getDayName(idx);
-              const isToday = idx === dayIndex;
-              const availability = checkWorkoutAvailability(session.id, session.type);
-              
-              return (
-                <button
-                  key={session.id}
-                  id={`session-card-${session.id}`}
-                  onClick={() => {
-                    if (!availability.allowed) return;
-                    setSelectedSessionId(session.id);
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }}
-                  disabled={!availability.allowed && !isCompleted}
-                  className={`p-5 rounded-2xl border transition-all duration-300 text-left relative overflow-hidden flex flex-col justify-between group h-48 shadow-sm ${
-                    isCompleted
-                      ? "bg-emerald-50/50 border-emerald-200 hover:border-emerald-300 cursor-pointer"
-                      : !availability.allowed
-                        ? "bg-zinc-50 border-zinc-200/50 opacity-50 cursor-not-allowed select-none"
-                        : isToday
-                          ? "bg-white border-blue-600 ring-2 ring-blue-600/10 hover:border-blue-700 cursor-pointer"
-                          : "bg-white border-zinc-200/80 hover:border-zinc-300 cursor-pointer"
-                  }`}
-                >
-                  {isToday && !isCompleted && availability.allowed && (
-                    <div className="absolute top-0 right-0 bg-blue-600 text-white text-[8px] font-bold px-2.5 py-1 rounded-bl-xl uppercase tracking-wider">
-                      Sesión Recomendada Hoy
-                    </div>
-                  )}
-
-                  {!isCompleted && !availability.allowed && (
-                    <div className="absolute top-0 right-0 bg-rose-50 text-rose-600 text-[8px] font-bold px-2.5 py-1 rounded-bl-xl uppercase tracking-wider border-l border-b border-rose-200 flex items-center gap-1">
-                      <Lock className="w-2.5 h-2.5" /> Bloqueado hoy
-                    </div>
-                  )}
-
-                  <div className="w-full flex items-center justify-between">
-                    <span className={`text-[10px] font-bold uppercase tracking-wider ${isCompleted ? "text-emerald-700" : isToday && availability.allowed ? "text-blue-600" : "text-zinc-400"}`}>
-                      Día {idx + 1} • {dayName}
-                    </span>
-                    {getSessionTypeBadge(session.type)}
-                  </div>
-                  
-                  <div className="mt-4 space-y-1.5">
-                    <h4 className="text-base font-bold text-zinc-900 uppercase tracking-tight line-clamp-1 group-hover:text-blue-600 transition-colors duration-200">
-                      {session.name}
-                    </h4>
-                    {!availability.allowed && !isCompleted ? (
-                      <p className="text-[10.5px] text-rose-600 font-medium leading-relaxed font-sans line-clamp-2">
-                        {availability.reason}
-                      </p>
-                    ) : session.objective ? (
-                      <p className="text-[11px] text-zinc-500 line-clamp-2 leading-relaxed font-sans font-medium">
-                        {session.objective}
-                      </p>
-                    ) : (
-                      <p className="text-[11px] text-zinc-400 italic font-sans">
-                        Sin objetivo específico definido.
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="w-full border-t border-zinc-100 pt-3 mt-4 flex items-center justify-between">
-                    {isCompleted ? (
-                      <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1">
-                        ✓ Completada • RPE {completedWorkouts[session.id]?.rpe}/10
-                      </span>
-                    ) : !availability.allowed ? (
-                      <span className="text-[9px] font-bold text-rose-600 uppercase tracking-wider flex items-center gap-1">
-                        <Lock className="w-3 h-3" /> No disponible hoy
-                      </span>
-                    ) : (
-                      <span className={`text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 transition-transform duration-200 group-hover:translate-x-1 ${isToday ? "text-blue-600" : "text-zinc-400"}`}>
-                        Empezar Sesión <ArrowRight className="w-3 h-3" />
-                      </span>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const session = activeWeek.sessions.find(s => s.id === selectedSessionId);
-  if (!session) {
-    return null;
-  }
+  const session = activeWeek.sessions.find(s => s.id === selectedSessionId) || defaultWorkout;
 
   const isCompleted = !!completedWorkouts[session.id];
-  const idx = activeWeek.sessions.findIndex(s => s.id === selectedSessionId);
+  const idx = activeWeek.sessions.findIndex(s => s.id === session.id);
   const dayName = getDayName(idx);
+  const isToday = idx === dayIndex;
   const step = getSessionStep(session.id);
+  const availability = checkWorkoutAvailability(session.id, session.type);
+
+  const goToDay = (targetIdx: number) => {
+    const clamped = Math.max(0, Math.min(activeWeek.sessions.length - 1, targetIdx));
+    const targetSession = activeWeek.sessions[clamped];
+    if (targetSession) {
+      setSelectedSessionId(targetSession.id);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
 
   // Calculate readiness and adaptation if expanded and readiness exists
   let sessionReadinessScore: DailyReadinessScore | null = null;
@@ -594,19 +455,73 @@ export default function TodayWorkoutView({
   return (
     <div className="max-w-4xl mx-auto pb-12 space-y-6">
       
-      {/* Back Button */}
+      {/* Day Navigation: la pestaña Hoy siempre abre el entrenamiento del día correspondiente; estas
+          flechas permiten hojear el resto de días de la semana sin volver a una lista. */}
       {step === "preview" && (
-        <div className="flex justify-start">
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedSessionId("");
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
-            className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-600 hover:text-blue-600 transition-colors duration-200 cursor-pointer bg-white px-4 py-2 border border-zinc-200/80 rounded-xl shadow-sm"
-          >
-            <ArrowLeft className="w-4 h-4" /> Volver a las sesiones
-          </button>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3 bg-white border border-zinc-200/80 rounded-2xl px-2 py-2.5 shadow-sm">
+            <button
+              type="button"
+              onClick={() => goToDay(idx - 1)}
+              disabled={idx <= 0}
+              aria-label="Día anterior"
+              className="p-2.5 rounded-xl border border-zinc-200/80 text-zinc-600 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-zinc-600 shrink-0"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+
+            <div className="text-center min-w-0">
+              <span className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? "text-blue-600" : "text-zinc-400"}`}>
+                Día {idx + 1} • {dayName}{isToday ? " · Hoy" : ""}
+              </span>
+              <p className="text-xs font-black text-zinc-900 uppercase tracking-tight mt-0.5 truncate">{session.name}</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => goToDay(idx + 1)}
+              disabled={idx >= activeWeek.sessions.length - 1}
+              aria-label="Día siguiente"
+              className="p-2.5 rounded-xl border border-zinc-200/80 text-zinc-600 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-zinc-600 shrink-0"
+            >
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Status Banner: reglas de doble sesión / límite diario */}
+          {todayCompleted.length > 0 && (
+            <div className={`p-4 rounded-xl border flex items-start gap-3 text-xs leading-relaxed text-left ${
+              todayCompleted.length === 1 && todayCompleted[0].rpe < 3 && (todayCompleted[0].type === "fuerza" || todayCompleted[0].type === "carrera")
+                ? "bg-blue-50/80 border-blue-200 text-blue-900"
+                : "bg-rose-50 border-rose-200 text-rose-900"
+            }`}>
+              {todayCompleted.length === 1 && todayCompleted[0].rpe < 3 && (todayCompleted[0].type === "fuerza" || todayCompleted[0].type === "carrera") ? (
+                <>
+                  <Zap className="w-5 h-5 shrink-0 mt-0.5 text-blue-600 animate-pulse" />
+                  <div>
+                    <span className="font-bold uppercase tracking-wider block mb-0.5 text-blue-600">Doble Sesión Permitida Excepcionalmente</span>
+                    <p className="font-medium text-zinc-700">
+                      Has completado tu sesión de <strong className="text-blue-600">{todayCompleted[0].type === "fuerza" ? "Fuerza" : "Carrera"}</strong> hoy con un esfuerzo muy bajo (RPE {todayCompleted[0].rpe}/10). Por lo tanto, hoy puedes realizar también tu sesión de <strong className="text-blue-600">{todayCompleted[0].type === "fuerza" ? "carrera" : "fuerza"}</strong>.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5 text-rose-600" />
+                  <div>
+                    <span className="font-bold uppercase tracking-wider block mb-0.5 text-rose-600">Límite Diario Alcanzado / Sesiones Bloqueadas</span>
+                    <p className="font-medium text-zinc-700">
+                      {todayCompleted.length >= 2 ? (
+                        `¡Excelente trabajo! Has completado el límite máximo de 2 entrenamientos para hoy. Descansa y recupérate para asimilar las cargas de entrenamiento.`
+                      ) : (
+                        `Ya has completado una sesión de ${todayCompleted[0].type === "fuerza" ? "Fuerza" : todayCompleted[0].type === "carrera" ? "Carrera" : todayCompleted[0].type || "entrenamiento"} hoy con un RPE de ${todayCompleted[0].rpe}/10 (igual o superior a 3). Las demás sesiones de fuerza y carrera han sido bloqueadas hasta mañana para evitar el sobreentrenamiento y prevenir lesiones.`
+                      )}
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -744,19 +659,29 @@ export default function TodayWorkoutView({
                     </div>
                   </div>
 
-                  <div className="flex justify-center pt-4 border-t border-zinc-100">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nextStep = hasLoggedReadiness ? "adapted" : "questionnaire";
-                        setSessionSteps(prev => ({ ...prev, [session.id]: nextStep }));
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                      }}
-                      className="w-full sm:w-auto px-10 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase tracking-wider rounded-xl text-xs transition shadow-sm cursor-pointer duration-200"
-                    >
-                      Empezar Entrenamiento
-                    </button>
-                  </div>
+                  {!availability.allowed ? (
+                    <div className="p-4 rounded-xl border bg-rose-50 border-rose-200 text-rose-900 flex items-start gap-3 text-left">
+                      <Lock className="w-5 h-5 shrink-0 mt-0.5 text-rose-600" />
+                      <div>
+                        <span className="font-bold uppercase tracking-wider text-[11px] block mb-0.5 text-rose-600">No disponible hoy</span>
+                        <p className="text-xs font-medium text-zinc-700 leading-relaxed">{availability.reason}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex justify-center pt-4 border-t border-zinc-100">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextStep = hasLoggedReadiness ? "adapted" : "questionnaire";
+                          setSessionSteps(prev => ({ ...prev, [session.id]: nextStep }));
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}
+                        className="w-full sm:w-auto px-10 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase tracking-wider rounded-xl text-xs transition shadow-sm cursor-pointer duration-200"
+                      >
+                        Empezar Entrenamiento
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1347,7 +1272,7 @@ export default function TodayWorkoutView({
                         type="button"
                         onClick={() => {
                           onLogWorkoutCompletion(session.id, feedback, loggedRpe);
-                          setSelectedSessionId("");
+                          setSelectedSessionId(defaultWorkout.id);
                           window.scrollTo({ top: 0, behavior: "smooth" });
                         }}
                         className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase tracking-wider rounded-xl text-xs transition cursor-pointer shadow-sm"

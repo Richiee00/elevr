@@ -5,7 +5,7 @@ import { HyroxDailyInput, adaptHyroxSession, generateHyroxSessionContent, getCac
 import { CATEGORY_LABELS } from "./hyroxLibrary";
 import HyroxWorkoutDetail from "./HyroxWorkoutDetail";
 import HyroxReadinessCard from "./HyroxReadinessCard";
-import { Moon, Flame, BrainCircuit, ChevronDown, ChevronUp } from "lucide-react";
+import { Moon, Flame, BrainCircuit, ChevronDown, ChevronUp, ArrowLeft, ArrowRight } from "lucide-react";
 
 interface HyroxTodayWorkoutViewProps {
   plan: HyroxTrainingPlan;
@@ -35,19 +35,25 @@ export default function HyroxTodayWorkoutView({
   const dayIndex = localDay === 0 ? 6 : localDay - 1;
 
   const activeWeek = plan.weeks[currentWeekIndex] || plan.weeks[0];
-  const todaySession = activeWeek.sessions[dayIndex] || activeWeek.sessions[0];
 
-  const isCompleted = !!completedWorkouts[todaySession.id];
-  const loggedFeedback = completedWorkouts[todaySession.id];
+  // La pestaña "Hoy" siempre abre el entrenamiento del día correspondiente en el plan; las flechas
+  // permiten hojear el resto de días de la semana por si el usuario prefiere hacer otro.
+  const [viewedDayIndex, setViewedDayIndex] = useState<number>(dayIndex);
+  const clampedDayIndex = Math.max(0, Math.min(activeWeek.sessions.length - 1, viewedDayIndex));
+  const viewedSession = activeWeek.sessions[clampedDayIndex] || activeWeek.sessions[0];
+  const isViewingToday = clampedDayIndex === dayIndex;
+
+  const isCompleted = !!completedWorkouts[viewedSession.id];
+  const loggedFeedback = completedWorkouts[viewedSession.id];
   const adaptation = adaptHyroxSession(readiness);
 
   useEffect(() => {
-    if (!onboarding || !todaySession.templateId || todaySession.category === "descanso") return;
-    if (getCachedGeneratedSession(todaySession.id)) return;
+    if (!onboarding || !viewedSession.templateId || viewedSession.category === "descanso") return;
+    if (getCachedGeneratedSession(viewedSession.id)) return;
 
     let cancelled = false;
-    generateHyroxSessionContent(todaySession.id, {
-      category: todaySession.category as "carrera" | "fuerza" | "acondicionamiento" | "simulacion",
+    generateHyroxSessionContent(viewedSession.id, {
+      category: viewedSession.category as "carrera" | "fuerza" | "acondicionamiento" | "simulacion",
       objective: onboarding.objective,
       limitantType: plan.initialDiagnostic.limitantType,
       experienceLevel: onboarding.experienceLevel,
@@ -65,24 +71,50 @@ export default function HyroxTodayWorkoutView({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todaySession.id]);
+  }, [viewedSession.id]);
 
-  const template = resolveHyroxSessionTemplate(todaySession);
+  const template = resolveHyroxSessionTemplate(viewedSession);
   // generatedVersion se referencia únicamente para forzar el re-render cuando Gemini termina de generar.
   void generatedVersion;
+
+  const goToDay = (targetIdx: number) => {
+    setViewedDayIndex(Math.max(0, Math.min(activeWeek.sessions.length - 1, targetIdx)));
+  };
 
   return (
     <div className="space-y-5">
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-zinc-200/80 shadow-sm">
-        <div className="flex items-center gap-2 text-blue-600 text-xs font-bold uppercase tracking-wider mb-2">
-          <Flame className="w-4 h-4" />
-          {DAY_NAMES[dayIndex]} · Semana {activeWeek.weekNumber}
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <button
+            type="button"
+            onClick={() => goToDay(clampedDayIndex - 1)}
+            disabled={clampedDayIndex <= 0}
+            aria-label="Día anterior"
+            className="p-2.5 rounded-xl border border-zinc-200/80 text-zinc-600 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-zinc-600 shrink-0"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+
+          <div className="flex items-center gap-2 text-blue-600 text-xs font-bold uppercase tracking-wider">
+            <Flame className="w-4 h-4" />
+            {DAY_NAMES[clampedDayIndex]} · Semana {activeWeek.weekNumber}{isViewingToday ? " · Hoy" : ""}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => goToDay(clampedDayIndex + 1)}
+            disabled={clampedDayIndex >= activeWeek.sessions.length - 1}
+            aria-label="Día siguiente"
+            className="p-2.5 rounded-xl border border-zinc-200/80 text-zinc-600 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-zinc-600 shrink-0"
+          >
+            <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
-        <h3 className="text-2xl sm:text-3xl font-black italic uppercase tracking-tight text-zinc-900">
+        <h3 className="text-2xl sm:text-3xl font-black italic uppercase tracking-tight text-zinc-900 text-center">
           {template ? template.name : "Día de Descanso"}
         </h3>
         {template && (
-          <p className="text-xs text-zinc-500 font-medium max-w-2xl mt-2 leading-relaxed">
+          <p className="text-xs text-zinc-500 font-medium max-w-2xl mt-2 leading-relaxed text-center mx-auto">
             {CATEGORY_LABELS[template.category]} · {template.durationMin} minutos · {template.description}
           </p>
         )}
@@ -126,7 +158,7 @@ export default function HyroxTodayWorkoutView({
             adaptationNote={adaptation.status !== "mantener" ? adaptation.justification : undefined}
             isCompleted={isCompleted}
             loggedFeedback={loggedFeedback}
-            onLogCompletion={(feedback, rpe) => onLogWorkoutCompletion(todaySession.id, feedback, rpe)}
+            onLogCompletion={(feedback, rpe) => onLogWorkoutCompletion(viewedSession.id, feedback, rpe)}
           />
         </div>
       )}
