@@ -435,7 +435,7 @@ export function estimateHyroxFinishTime(data: HyroxOnboardingData, vamKmH?: numb
 
   // Estación + transiciones: sin splits reales, usamos una constante genérica ajustada por división
   // (independiente del VAM, que solo afecta a la parte de carrera).
-  const stationTransitionSeconds = data.division === HyroxDivision.PRO ? 2700 : data.division === HyroxDivision.DOUBLES ? 2100 : 2400;
+  const stationTransitionSeconds = data.division === HyroxDivision.PRO ? 2700 : 2400;
 
   // Resto de objetivos: si hay Test VAM, estimamos el tiempo de carrera real con las zonas HYROX del
   // cerebro (Z1 conservador, Z2 realista, Z3 agresivo) en vez de un total genérico fijo por división.
@@ -450,7 +450,6 @@ export function estimateHyroxFinishTime(data: HyroxOnboardingData, vamKmH?: numb
   // Sin datos de carrera ni Test VAM: estimación conservadora genérica por división.
   let baseSeconds = 6000;
   if (data.division === HyroxDivision.PRO) baseSeconds += 900;
-  if (data.division === HyroxDivision.DOUBLES) baseSeconds -= 600;
   return { conservador: formatSecondsToTime(baseSeconds + 600), realista: formatSecondsToTime(baseSeconds) };
 }
 

@@ -258,8 +258,8 @@ export function predictMarks(data: OnboardingData): Record<string, string> {
   } else if (data.vamTestDistance) {
     // VAM Test: 5 minutes. Estimate 5K, 10K based on VAM
     const vamKmh = (data.vamTestDistance / 300) * 3.6; // Speed in km/h
-    // Estimate 10K as running at 80% VAM
-    const est10KSpeed = vamKmh * 0.82;
+    // Estimate 10K a un 85% del VAM (misma referencia que calculateTrainingZones, sin dos % distintos).
+    const est10KSpeed = vamKmh * 0.85;
     referenceSecs = (10 / est10KSpeed) * 3600;
     referenceDistance = 10;
   } else {
@@ -324,44 +324,45 @@ export function calculateTrainingZones(data: OnboardingData): TrainingZones {
     }
   }
 
-  // Apply formulas based on 10K base pace
+  // Apply formulas based on 10K base pace. Cada zona se muestra siempre rápido -> lento, tal y
+  // como lo escribe el propio cerebro en su ejemplo ("Rodaje suave: 5:36 - 6:06/km").
   // 1. Rodaje regenerativo: Pace + 75 to +105 s
-  const regenMin = secondsToPace(basePaceSecs + 105);
-  const regenMax = secondsToPace(basePaceSecs + 75);
+  const regenFast = secondsToPace(basePaceSecs + 75);
+  const regenSlow = secondsToPace(basePaceSecs + 105);
 
   // 2. Rodaje suave: Pace + 45 to +75 s
-  const suaveMin = secondsToPace(basePaceSecs + 75);
-  const suaveMax = secondsToPace(basePaceSecs + 45);
+  const suaveFast = secondsToPace(basePaceSecs + 45);
+  const suaveSlow = secondsToPace(basePaceSecs + 75);
 
   // 3. Rodaje controlado: Pace + 20 to + 40 s
-  const ctrlMin = secondsToPace(basePaceSecs + 40);
-  const ctrlMax = secondsToPace(basePaceSecs + 20);
+  const ctrlFast = secondsToPace(basePaceSecs + 20);
+  const ctrlSlow = secondsToPace(basePaceSecs + 40);
 
   // 4. Tempo: Pace ± 10 s
-  const tempoMin = secondsToPace(basePaceSecs + 10);
-  const tempoMax = secondsToPace(basePaceSecs - 10);
+  const tempoFast = secondsToPace(basePaceSecs - 10);
+  const tempoSlow = secondsToPace(basePaceSecs + 10);
 
   // 5. Umbral: Pace -15 to -25 s
-  const umbralMin = secondsToPace(basePaceSecs - 15);
-  const umbralMax = secondsToPace(basePaceSecs - 25);
+  const umbralFast = secondsToPace(basePaceSecs - 25);
+  const umbralSlow = secondsToPace(basePaceSecs - 15);
 
   // 6. Series largas: Pace -20 to -40 s
-  const seriesLMin = secondsToPace(basePaceSecs - 20);
-  const seriesLMax = secondsToPace(basePaceSecs - 40);
+  const seriesLFast = secondsToPace(basePaceSecs - 40);
+  const seriesLSlow = secondsToPace(basePaceSecs - 20);
 
   // 7. Series cortas: Pace -30 to -60 s
-  const seriesCMin = secondsToPace(basePaceSecs - 30);
-  const seriesCMax = secondsToPace(basePaceSecs - 60);
+  const seriesCFast = secondsToPace(basePaceSecs - 60);
+  const seriesCSlow = secondsToPace(basePaceSecs - 30);
 
   return {
     paceActual: secondsToPace(basePaceSecs),
-    regenerative: `${regenMin} a ${regenMax}`,
-    suave: `${suaveMin} a ${suaveMax}`,
-    controlado: `${ctrlMin} a ${ctrlMax}`,
-    tempo: `${tempoMin} a ${tempoMax}`,
-    umbral: `${umbralMin} a ${umbralMax}`,
-    seriesLargas: `${seriesLMin} a ${seriesLMax}`,
-    seriesCortas: `${seriesCMin} a ${seriesCMax}`,
+    regenerative: `${regenFast} a ${regenSlow}`,
+    suave: `${suaveFast} a ${suaveSlow}`,
+    controlado: `${ctrlFast} a ${ctrlSlow}`,
+    tempo: `${tempoFast} a ${tempoSlow}`,
+    umbral: `${umbralFast} a ${umbralSlow}`,
+    seriesLargas: `${seriesLFast} a ${seriesLSlow}`,
+    seriesCortas: `${seriesCFast} a ${seriesCSlow}`,
     rpeDescription: {
       easy: "Suave / Cómodo: RPE 2-4. Se puede mantener una conversación fluida sin problemas.",
       aerobic: "Aeróbico medio: RPE 5-6. Respiración constante, conversación en frases cortas.",
@@ -457,21 +458,33 @@ export function generateTrainingPlan(data: OnboardingData): TrainingPlan {
     targets.realista = "Completar los 10K sintiendo control y con RPE <6.";
     targets.agresivo = "Acercarse a un tiempo sub-60 minutos.";
   } else if (data.objective === RunningObjective.MEJORAR_10K && data.time10K) {
+    // Mejora realista 10K, plan de 8 semanas (cerebro): valores fijos, no un rango calculado.
     const totalSecs = parseTimeToSeconds(data.time10K);
-    const improvement = levelEstimated === "Principiante" ? 0.06 : levelEstimated === "Intermedio" ? 0.04 : 0.02;
-    targets.conservador = formatSecondsToTime(totalSecs * (1 - improvement * 0.5));
-    targets.realista = formatSecondsToTime(totalSecs * (1 - improvement));
-    targets.agresivo = formatSecondsToTime(totalSecs * (1 - improvement * 1.5));
+    const pct10K =
+      levelEstimated === "Principiante"
+        ? { conservador: 0.04, realista: 0.05, agresivo: 0.07 }
+        : levelEstimated === "Intermedio"
+        ? { conservador: 0.03, realista: 0.035, agresivo: 0.04 }
+        : { conservador: 0.01, realista: 0.015, agresivo: 0.03 };
+    targets.conservador = formatSecondsToTime(totalSecs * (1 - pct10K.conservador));
+    targets.realista = formatSecondsToTime(totalSecs * (1 - pct10K.realista));
+    targets.agresivo = formatSecondsToTime(totalSecs * (1 - pct10K.agresivo));
   } else if (data.objective === RunningObjective.PRIMER_21K) {
     targets.conservador = "Cruzar la meta corriendo y sin lesiones.";
     targets.realista = "Correr cómodamente, con tiempo estimado de: " + (estimatedPaces["21K"] || "2:05:00");
     targets.agresivo = "Lograr una marca por debajo de 2 horas.";
   } else if (data.objective === RunningObjective.MEJORAR_21K && data.time21K) {
+    // Mejora realista 21K, plan de 12 semanas (cerebro): valores fijos, no un rango calculado.
     const totalSecs = parseTimeToSeconds(data.time21K);
-    const improvement = levelEstimated === "Principiante" ? 0.07 : levelEstimated === "Intermedio" ? 0.05 : 0.025;
-    targets.conservador = formatSecondsToTime(totalSecs * (1 - improvement * 0.5));
-    targets.realista = formatSecondsToTime(totalSecs * (1 - improvement));
-    targets.agresivo = formatSecondsToTime(totalSecs * (1 - improvement * 1.5));
+    const pct21K =
+      levelEstimated === "Principiante"
+        ? { conservador: 0.04, realista: 0.05, agresivo: 0.07 }
+        : levelEstimated === "Intermedio"
+        ? { conservador: 0.03, realista: 0.04, agresivo: 0.05 }
+        : { conservador: 0.015, realista: 0.02, agresivo: 0.03 };
+    targets.conservador = formatSecondsToTime(totalSecs * (1 - pct21K.conservador));
+    targets.realista = formatSecondsToTime(totalSecs * (1 - pct21K.realista));
+    targets.agresivo = formatSecondsToTime(totalSecs * (1 - pct21K.agresivo));
   } else {
     targets.conservador = "Mejorar la tolerancia a la velocidad aeróbica.";
     targets.realista = "Reducir el ritmo de carrera de fondo en 15-20 seg/km.";

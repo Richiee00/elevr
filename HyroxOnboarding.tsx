@@ -63,20 +63,15 @@ const STEP_TITLES: Record<StepKey, string> = {
   perfil: "PERFIL FISIOLÓGICO"
 };
 
+// Las categorías de dobles se retiraron: no había tabla de tiempos real que las respaldara.
 const RACE_CATEGORY_OPTIONS: Array<{ val: HyroxRaceCategory; label: string; group: string }> = [
   { val: "open_masculina", label: "Open Masculina", group: "Open" },
   { val: "open_femenina", label: "Open Femenina", group: "Open" },
   { val: "pro_masculina", label: "Pro Masculina", group: "Pro" },
-  { val: "pro_femenina", label: "Pro Femenina", group: "Pro" },
-  { val: "dobles_masculina_open", label: "Dobles Masculina Open", group: "Dobles Open" },
-  { val: "dobles_femenina_open", label: "Dobles Femenina Open", group: "Dobles Open" },
-  { val: "dobles_mixtos", label: "Dobles Mixtos", group: "Dobles Open" },
-  { val: "dobles_masculina_pro", label: "Dobles Masculina Pro", group: "Dobles Pro" },
-  { val: "dobles_femenina_pro", label: "Dobles Femenina Pro", group: "Dobles Pro" }
+  { val: "pro_femenina", label: "Pro Femenina", group: "Pro" }
 ];
 
 function deriveDivision(category: HyroxRaceCategory): HyroxDivision {
-  if (category.startsWith("dobles")) return HyroxDivision.DOUBLES;
   if (category.startsWith("pro")) return HyroxDivision.PRO;
   return HyroxDivision.OPEN;
 }
@@ -403,7 +398,7 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
               <p className="text-xs text-zinc-500 font-medium leading-relaxed">
                 Indica la categoría de competición. La usamos para calcular tu diagnóstico y tiempos objetivo con precisión.
               </p>
-              {["Open", "Pro", "Dobles Open", "Dobles Pro"].map(group => (
+              {["Open", "Pro"].map(group => (
                 <div key={group} className="space-y-2">
                   <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 block">{group}</label>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">

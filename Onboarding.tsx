@@ -60,6 +60,11 @@ export default function Onboarding({ onComplete, onCancel, stepOffset = 0 }: Onb
   useEffect(() => {
     if (objective === RunningObjective.PRIMER_10K && frequency === FrequencyOption.FREQ_5_2) {
       setFrequency(FrequencyOption.FREQ_3_2);
+    } else if (
+      (objective === RunningObjective.MEJORAR_10K || objective === RunningObjective.MEJORAR_21K) &&
+      (frequency === FrequencyOption.FREQ_2_2 || frequency === FrequencyOption.FREQ_5_2)
+    ) {
+      setFrequency(FrequencyOption.FREQ_3_2);
     }
   }, [objective, frequency]);
 
@@ -419,7 +424,13 @@ export default function Onboarding({ onComplete, onCancel, stepOffset = 0 }: Onb
                     { val: FrequencyOption.FREQ_4_2, label: "4 + 2", desc: "4 carrera + 2 fuerza" },
                     { val: FrequencyOption.FREQ_5_2, label: "5 + 2", desc: "5 carrera + 2 fuerza" }
                   ]
-                    .filter(f => objective !== RunningObjective.PRIMER_10K || f.val !== FrequencyOption.FREQ_5_2)
+                    .filter(f => {
+                      if (objective === RunningObjective.PRIMER_10K) return f.val !== FrequencyOption.FREQ_5_2;
+                      if (objective === RunningObjective.MEJORAR_10K || objective === RunningObjective.MEJORAR_21K) {
+                        return f.val === FrequencyOption.FREQ_3_2 || f.val === FrequencyOption.FREQ_4_2;
+                      }
+                      return true;
+                    })
                     .map(f => (
                     <button
                       key={f.val}

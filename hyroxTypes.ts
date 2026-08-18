@@ -20,21 +20,16 @@ export const HYROX_OBJECTIVE_WITH_FULL_PERFORMANCE_DATA = HyroxObjective.MEJORAR
 
 export enum HyroxDivision {
   OPEN = "open",
-  PRO = "pro",
-  DOUBLES = "doubles"
+  PRO = "pro"
 }
 
 // Categoría oficial de competición: determina qué fila de HYROX_BENCHMARKS / HYROX_DEBUTANTE_RANGE se usa.
+// Las categorías de dobles se retiraron de la app: no había tabla de tiempos real que las respaldara.
 export type HyroxRaceCategory =
   | "open_masculina"
   | "open_femenina"
   | "pro_masculina"
-  | "pro_femenina"
-  | "dobles_masculina_open"
-  | "dobles_femenina_open"
-  | "dobles_masculina_pro"
-  | "dobles_femenina_pro"
-  | "dobles_mixtos";
+  | "pro_femenina";
 
 export type HyroxBenchmarkBand = "sub60" | "sub65" | "sub70" | "sub75" | "sub80" | "sub85" | "sub90";
 
