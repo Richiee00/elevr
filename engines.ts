@@ -434,7 +434,11 @@ export function generateTrainingPlan(data: OnboardingData): TrainingPlan {
     else levelEstimated = "Avanzado";
   } else if (data.objective === RunningObjective.PRIMER_21K) {
     durationWeeks = 12; // default
-    levelEstimated = "Intermedio";
+    // El cerebro exige usar el tiempo de 10K para estimar el nivel actual (no un valor fijo).
+    const paceSec = parseTimeToSeconds(data.time10K || "55:00") / 10;
+    if (paceSec > 360) levelEstimated = "Principiante";
+    else if (paceSec >= 270) levelEstimated = "Intermedio";
+    else levelEstimated = "Avanzado";
   } else if (data.objective === RunningObjective.MEJORAR_21K) {
     durationWeeks = 12; // default
     const paceSec = parseTimeToSeconds(data.time21K || "02:00:00") / 21.1;

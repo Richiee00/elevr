@@ -10,7 +10,8 @@ import {
   ShieldAlert,
   Flame,
   Calendar,
-  Layers
+  Layers,
+  Target
 } from "lucide-react";
 
 interface DashboardProps {
@@ -156,8 +157,13 @@ export default function Dashboard({ plan, activeInjury, injuryAreas }: Dashboard
       desc: "Ritmo de crucero alegre. Desarrolla resistencia muscular."
     },
     {
-      label: "Tempo / Umbral",
+      label: "Tempo",
       value: zones.tempo,
+      desc: "Ritmo sostenido justo por debajo del umbral. Mejora la resistencia a la fatiga."
+    },
+    {
+      label: "Umbral",
+      value: zones.umbral,
       desc: "Mejora el aclaramiento de lactato para correr rápido por más tiempo."
     },
     {
@@ -261,6 +267,36 @@ export default function Dashboard({ plan, activeInjury, injuryAreas }: Dashboard
         <div className="space-y-5 lg:col-span-2">
           <div>
             {renderBMIWidget(initialDiagnostic.bmi, initialDiagnostic.bmiCategory)}
+          </div>
+
+          <div className="bg-white rounded-2xl p-6 border border-zinc-200/80 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <Target className="w-4 h-4 text-blue-600" />
+              <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-900">
+                Objetivo de Carrera
+              </h4>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Conservador</p>
+                <p className="text-sm sm:text-base font-black text-zinc-900 mt-1.5 leading-snug">
+                  {initialDiagnostic.targets.conservador}
+                </p>
+              </div>
+              <div className="bg-blue-50/60 border border-blue-200 rounded-2xl p-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-blue-600">Realista</p>
+                <p className="text-sm sm:text-base font-black text-blue-700 mt-1.5 leading-snug">
+                  {initialDiagnostic.targets.realista}
+                </p>
+              </div>
+              <div className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Agresivo</p>
+                <p className="text-sm sm:text-base font-black text-zinc-900 mt-1.5 leading-snug">
+                  {initialDiagnostic.targets.agresivo}
+                </p>
+              </div>
+            </div>
           </div>
 
           <div className="bg-white rounded-2xl p-6 border border-zinc-200/80 shadow-sm">

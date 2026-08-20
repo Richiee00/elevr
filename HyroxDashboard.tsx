@@ -182,7 +182,7 @@ export default function HyroxDashboard({ plan, activeInjury, injuryAreas, comple
               <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-900">Tiempo Objetivo de Carrera</h4>
             </div>
 
-            {!vamTest ? (
+            {!initialDiagnostic.estimatedFinishTime.agresivo ? (
               <>
                 <div className="py-5 text-center">
                   <p className="text-2xl font-black text-zinc-400 italic">Analizando…</p>
@@ -212,8 +212,9 @@ export default function HyroxDashboard({ plan, activeInjury, injuryAreas, comple
             ) : (
               <>
                 <p className="text-xs text-zinc-500 font-medium leading-relaxed mb-5">
-                  Estimación calculada en base a tu nivel, división y estaciones débiles reportadas. Ritmo VAM: {vamTest.vamPaceMinKm} /km ({vamTest.vamKmH}{" "}
-                  km/h).
+                  {vamTest
+                    ? `Estimación calculada en base a tu nivel, división y estaciones débiles reportadas. Ritmo VAM: ${vamTest.vamPaceMinKm} /km (${vamTest.vamKmH} km/h).`
+                    : "Estimación calculada en base a tu categoría de competición y los datos de rendimiento que aportaste."}
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -225,13 +226,17 @@ export default function HyroxDashboard({ plan, activeInjury, injuryAreas, comple
                     <p className="text-xs font-bold uppercase tracking-wider text-blue-600">Realista</p>
                     <p className="text-xl sm:text-2xl font-black text-blue-700 font-mono mt-1">{initialDiagnostic.estimatedFinishTime.realista}</p>
                   </div>
-                  {initialDiagnostic.estimatedFinishTime.agresivo && (
-                    <div className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-4">
-                      <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Agresivo</p>
-                      <p className="text-xl sm:text-2xl font-black text-zinc-900 font-mono mt-1">{initialDiagnostic.estimatedFinishTime.agresivo}</p>
-                    </div>
-                  )}
+                  <div className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-4">
+                    <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Agresivo</p>
+                    <p className="text-xl sm:text-2xl font-black text-zinc-900 font-mono mt-1">{initialDiagnostic.estimatedFinishTime.agresivo}</p>
+                  </div>
                 </div>
+
+                {!vamTest && (
+                  <p className="text-[11px] text-zinc-400 font-medium leading-relaxed mt-4">
+                    Completa el Test VAM en cualquier momento para desbloquear además tus zonas de ritmo reales en el Perfil.
+                  </p>
+                )}
               </>
             )}
 
