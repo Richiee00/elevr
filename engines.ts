@@ -12,6 +12,17 @@ import {
   AdaptedWorkoutResult
 } from "./types";
 
+// Objetivos cuyos objetivos de carrera y zonas de ritmo "calculadas" dependen exclusivamente del
+// Test VAM (no de un tiempo de 10K/21K introducido por el usuario, que puede ser antiguo y no
+// reflejar su forma física actual). Hasta que no completan el test no se muestra ningún número.
+export const NEEDS_VAM_OBJECTIVES = new Set<RunningObjective>([
+  RunningObjective.PRIMER_10K,
+  RunningObjective.MEJORAR_10K,
+  RunningObjective.PRIMER_21K,
+  RunningObjective.MEJORAR_21K,
+  RunningObjective.MEJORAR_RITMO
+]);
+
 // ============================================================================
 // HELPER FUNCTIONS FOR PACE AND TIME MANIPULATION
 // ============================================================================
@@ -65,6 +76,110 @@ export function formatDateEU(dateInput: string | Date): string {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const yyyy = d.getFullYear();
   return `${dd}/${mm}/${yyyy}`;
+}
+
+// ============================================================================
+// TEST VAM (RUNNING): protocolo de 5 minutos a máximo esfuerzo sostenible.
+// ============================================================================
+
+export const RUNNING_VAM_TEST_DURATION_MIN = 5;
+
+export function calculateVAMFromRunningTest(distanceMeters: number): { vamKmH: number; vamPaceMinKm: string } {
+  const km = distanceMeters / 1000;
+  const hours = RUNNING_VAM_TEST_DURATION_MIN / 60;
+  const vamKmh = hours > 0 ? km / hours : 0;
+  const paceSecsPerKm = vamKmh > 0 ? 3600 / vamKmh : 0;
+  return { vamKmH: Math.round(vamKmh * 10) / 10, vamPaceMinKm: paceSecsPerKm > 0 ? secondsToPace(paceSecsPerKm) : "--:--" };
+}
+
+// ============================================================================
+// PREDICTOR DE MARCAS (fórmula de Riegel) a partir de una referencia directa
+// (distancia real recorrida + tiempo real invertido), reutilizable tanto para
+// el cálculo inicial por onboarding como para el recálculo con resultados reales.
+// ============================================================================
+
+export function recalculateMarksFromResult(referenceDistanceKm: number, referenceSecs: number): Record<string, string> {
+  if (!referenceDistanceKm || !referenceSecs) {
+    return { "5K": "--:--", "10K": "--:--", "21K": "--:--", "42K": "--:--" };
+  }
+  const predictTime = (targetDist: number): string => {
+    const secs = referenceSecs * Math.pow(targetDist / referenceDistanceKm, 1.06);
+    return formatSecondsToTime(secs);
+  };
+  return {
+    "5K": predictTime(5),
+    "10K": predictTime(10),
+    "21K": predictTime(21.1),
+    "42K": predictTime(42.2)
+  };
+}
+
+// ============================================================================
+// OBJETIVOS DE CARRERA CONCRETOS (conservador/realista/agresivo) a partir de un
+// tiempo de referencia y el nivel estimado. Mismas tablas de mejora que usa el
+// cerebro para "Mejorar 10K"/"Mejorar 21K"; reutilizadas por cualquier objetivo
+// que necesite objetivos numéricos derivados de un tiempo base (real o predicho).
+// ============================================================================
+
+export function computeConcrete10KTargets(
+  totalSecs: number,
+  levelEstimated: "Principiante" | "Intermedio" | "Avanzado"
+): { conservador: string; realista: string; agresivo: string } {
+  const pct10K =
+    levelEstimated === "Principiante"
+      ? { conservador: 0.04, realista: 0.05, agresivo: 0.07 }
+      : levelEstimated === "Intermedio"
+      ? { conservador: 0.03, realista: 0.035, agresivo: 0.04 }
+      : { conservador: 0.01, realista: 0.015, agresivo: 0.03 };
+  return {
+    conservador: formatSecondsToTime(totalSecs * (1 - pct10K.conservador)),
+    realista: formatSecondsToTime(totalSecs * (1 - pct10K.realista)),
+    agresivo: formatSecondsToTime(totalSecs * (1 - pct10K.agresivo))
+  };
+}
+
+export function computeConcrete21KTargets(
+  totalSecs: number,
+  levelEstimated: "Principiante" | "Intermedio" | "Avanzado"
+): { conservador: string; realista: string; agresivo: string } {
+  const pct21K =
+    levelEstimated === "Principiante"
+      ? { conservador: 0.04, realista: 0.05, agresivo: 0.07 }
+      : levelEstimated === "Intermedio"
+      ? { conservador: 0.03, realista: 0.04, agresivo: 0.05 }
+      : { conservador: 0.015, realista: 0.02, agresivo: 0.03 };
+  return {
+    conservador: formatSecondsToTime(totalSecs * (1 - pct21K.conservador)),
+    realista: formatSecondsToTime(totalSecs * (1 - pct21K.realista)),
+    agresivo: formatSecondsToTime(totalSecs * (1 - pct21K.agresivo))
+  };
+}
+
+function classifyLevelFrom10KPace(time10K: string | undefined): "Principiante" | "Intermedio" | "Avanzado" {
+  const paceSec = parseTimeToSeconds(time10K || "55:00") / 10;
+  if (paceSec > 360) return "Principiante";
+  if (paceSec >= 270) return "Intermedio";
+  return "Avanzado";
+}
+
+// Ninguno de los 5 objetivos gateados por VAM tiene una marca real de referencia hasta que se
+// completa el Test VAM (nunca a partir de un tiempo introducido, que puede ser antiguo). Una vez
+// hecho el test, se estima un 10K equivalente al 85% del VAM (misma referencia que el resto de la
+// app) y sobre esa base se aplican las mismas tablas de mejora que Mejorar 10K/21K, según el
+// objetivo sea sobre distancia de 10K o de 21K.
+export function estimateTargetsFromVAM(
+  vamKmH: number,
+  levelEstimated: "Principiante" | "Intermedio" | "Avanzado",
+  raceDistance: "10K" | "21K"
+): { targets: { conservador: string; realista: string; agresivo: string }; estimatedPaces: Record<string, string> } {
+  const est10KSpeed = vamKmH * 0.85;
+  const totalSecs10K = est10KSpeed > 0 ? (10 / est10KSpeed) * 3600 : 0;
+  const estimatedPaces = recalculateMarksFromResult(10, totalSecs10K);
+  const targets =
+    raceDistance === "21K"
+      ? computeConcrete21KTargets(parseTimeToSeconds(estimatedPaces["21K"]), levelEstimated)
+      : computeConcrete10KTargets(totalSecs10K, levelEstimated);
+  return { targets, estimatedPaces };
 }
 
 // ============================================================================
@@ -246,6 +361,14 @@ export function estimateSuccessProbability(data: OnboardingData): "Muy Alta" | "
 }
 
 export function predictMarks(data: OnboardingData): Record<string, string> {
+  // Mi Primer 10K, Mejorar 10K, Mi Primer 21K, Mejorar 21K y Mejorar Ritmo no tienen ninguna marca
+  // real todavía: el predictor se calcula más adelante a partir del resultado real de la tirada
+  // larga aeróbica (ver checkpoints por semana en ProfileView), nunca desde un tiempo introducido
+  // que puede ser antiguo y ya no reflejar la forma física actual del usuario.
+  if (NEEDS_VAM_OBJECTIVES.has(data.objective)) {
+    return { "5K": "--:--", "10K": "--:--", "21K": "--:--", "42K": "--:--" };
+  }
+
   let referenceSecs = 0;
   let referenceDistance = 0;
 
@@ -256,11 +379,10 @@ export function predictMarks(data: OnboardingData): Record<string, string> {
     referenceSecs = parseTimeToSeconds(data.time21K);
     referenceDistance = 21.1;
   } else if (data.vamTestDistance) {
-    // VAM Test: 5 minutes. Estimate 5K, 10K based on VAM
-    const vamKmh = (data.vamTestDistance / 300) * 3.6; // Speed in km/h
-    // Estimate 10K a un 85% del VAM (misma referencia que calculateTrainingZones, sin dos % distintos).
-    const est10KSpeed = vamKmh * 0.85;
-    referenceSecs = (10 / est10KSpeed) * 3600;
+    // Test VAM de 5 minutos. Estimar 10K al 85% del VAM (misma referencia que calculateTrainingZones).
+    const { vamKmH } = calculateVAMFromRunningTest(data.vamTestDistance);
+    const est10KSpeed = vamKmH * 0.85;
+    referenceSecs = est10KSpeed > 0 ? (10 / est10KSpeed) * 3600 : 0;
     referenceDistance = 10;
   } else {
     // Standard defaults based on objective/experience
@@ -274,18 +396,7 @@ export function predictMarks(data: OnboardingData): Record<string, string> {
     referenceDistance = 10;
   }
 
-  // Riegel's formula: T2 = T1 * (D2/D1)^1.06
-  const predictTime = (targetDist: number): string => {
-    const secs = referenceSecs * Math.pow(targetDist / referenceDistance, 1.06);
-    return formatSecondsToTime(secs);
-  };
-
-  return {
-    "5K": predictTime(5),
-    "10K": predictTime(10),
-    "21K": predictTime(21.1),
-    "42K": predictTime(42.2)
-  };
+  return recalculateMarksFromResult(referenceDistance, referenceSecs);
 }
 
 // ============================================================================
@@ -405,7 +516,16 @@ const FUERZA_B_TEMPLATE = {
 // ============================================================================
 
 export function generateTrainingPlan(data: OnboardingData): TrainingPlan {
-  const zones = calculateTrainingZones(data);
+  // Para los objetivos que dependen del Test VAM, las sesiones diarias necesitan igualmente un ritmo
+  // de referencia desde el día 1 (aunque sea genérico): se ignora cualquier tiempo de 10K/21K/VAM
+  // introducido en el onboarding y se cae al fallback por nivel/genérico de calculateTrainingZones.
+  // El Dashboard, en cambio, no mostrará estas zonas como "calculadas" hasta completar el Test VAM
+  // real (ver App.tsx -> handleSaveVAMTest, que sí recalcula plan.zones con el dato real).
+  const zones = calculateTrainingZones(
+    NEEDS_VAM_OBJECTIVES.has(data.objective)
+      ? { ...data, time10K: undefined, time21K: undefined, vamTestDistance: undefined }
+      : data
+  );
   const limitants = detectLimitant(data);
   const successProb = estimateSuccessProbability(data);
   const estimatedPaces = predictMarks(data);
@@ -428,17 +548,11 @@ export function generateTrainingPlan(data: OnboardingData): TrainingPlan {
     }
   } else if (data.objective === RunningObjective.MEJORAR_10K) {
     durationWeeks = data.frequency === FrequencyOption.FREQ_3_2 ? 8 : 10;
-    const paceSec = parseTimeToSeconds(data.time10K || "55:00") / 10;
-    if (paceSec > 360) levelEstimated = "Principiante";
-    else if (paceSec >= 270) levelEstimated = "Intermedio";
-    else levelEstimated = "Avanzado";
+    levelEstimated = classifyLevelFrom10KPace(data.time10K);
   } else if (data.objective === RunningObjective.PRIMER_21K) {
     durationWeeks = 12; // default
     // El cerebro exige usar el tiempo de 10K para estimar el nivel actual (no un valor fijo).
-    const paceSec = parseTimeToSeconds(data.time10K || "55:00") / 10;
-    if (paceSec > 360) levelEstimated = "Principiante";
-    else if (paceSec >= 270) levelEstimated = "Intermedio";
-    else levelEstimated = "Avanzado";
+    levelEstimated = classifyLevelFrom10KPace(data.time10K);
   } else if (data.objective === RunningObjective.MEJORAR_21K) {
     durationWeeks = 12; // default
     const paceSec = parseTimeToSeconds(data.time21K || "02:00:00") / 21.1;
@@ -447,7 +561,8 @@ export function generateTrainingPlan(data: OnboardingData): TrainingPlan {
     else levelEstimated = "Avanzado";
   } else if (data.objective === RunningObjective.MEJORAR_RITMO) {
     durationWeeks = 8;
-    levelEstimated = "Intermedio";
+    // El cerebro exige usar el tiempo de 10K para estimar el nivel actual (no un valor fijo).
+    levelEstimated = classifyLevelFrom10KPace(data.time10K);
   } else if (data.objective === RunningObjective.MEJORAR_RESISTENCIA) {
     durationWeeks = 10;
     if (data.maxDistanceCurrent === "less_5") levelEstimated = "Principiante";
@@ -455,41 +570,12 @@ export function generateTrainingPlan(data: OnboardingData): TrainingPlan {
     else levelEstimated = "Avanzado";
   }
 
-  // Set target paces based on objective
+  // Objetivos de carrera: para Mi Primer 10K/21K, Mejorar 10K/21K y Mejorar Ritmo, los objetivos
+  // numéricos concretos solo se pueden calcular una vez completado el Test VAM real (ver App.tsx ->
+  // handleSaveVAMTest), nunca a partir de un tiempo introducido en el onboarding que puede ser
+  // antiguo. Solo Mejorar Resistencia conserva un objetivo descriptivo genérico, sin marca de tiempo.
   let targets = { conservador: "", realista: "", agresivo: "" };
-  if (data.objective === RunningObjective.PRIMER_10K) {
-    targets.conservador = "Completar la distancia corriendo de forma continua.";
-    targets.realista = "Completar los 10K sintiendo control y con RPE <6.";
-    targets.agresivo = "Acercarse a un tiempo sub-60 minutos.";
-  } else if (data.objective === RunningObjective.MEJORAR_10K && data.time10K) {
-    // Mejora realista 10K, plan de 8 semanas (cerebro): valores fijos, no un rango calculado.
-    const totalSecs = parseTimeToSeconds(data.time10K);
-    const pct10K =
-      levelEstimated === "Principiante"
-        ? { conservador: 0.04, realista: 0.05, agresivo: 0.07 }
-        : levelEstimated === "Intermedio"
-        ? { conservador: 0.03, realista: 0.035, agresivo: 0.04 }
-        : { conservador: 0.01, realista: 0.015, agresivo: 0.03 };
-    targets.conservador = formatSecondsToTime(totalSecs * (1 - pct10K.conservador));
-    targets.realista = formatSecondsToTime(totalSecs * (1 - pct10K.realista));
-    targets.agresivo = formatSecondsToTime(totalSecs * (1 - pct10K.agresivo));
-  } else if (data.objective === RunningObjective.PRIMER_21K) {
-    targets.conservador = "Cruzar la meta corriendo y sin lesiones.";
-    targets.realista = "Correr cómodamente, con tiempo estimado de: " + (estimatedPaces["21K"] || "2:05:00");
-    targets.agresivo = "Lograr una marca por debajo de 2 horas.";
-  } else if (data.objective === RunningObjective.MEJORAR_21K && data.time21K) {
-    // Mejora realista 21K, plan de 12 semanas (cerebro): valores fijos, no un rango calculado.
-    const totalSecs = parseTimeToSeconds(data.time21K);
-    const pct21K =
-      levelEstimated === "Principiante"
-        ? { conservador: 0.04, realista: 0.05, agresivo: 0.07 }
-        : levelEstimated === "Intermedio"
-        ? { conservador: 0.03, realista: 0.04, agresivo: 0.05 }
-        : { conservador: 0.015, realista: 0.02, agresivo: 0.03 };
-    targets.conservador = formatSecondsToTime(totalSecs * (1 - pct21K.conservador));
-    targets.realista = formatSecondsToTime(totalSecs * (1 - pct21K.realista));
-    targets.agresivo = formatSecondsToTime(totalSecs * (1 - pct21K.agresivo));
-  } else {
+  if (!NEEDS_VAM_OBJECTIVES.has(data.objective)) {
     targets.conservador = "Mejorar la tolerancia a la velocidad aeróbica.";
     targets.realista = "Reducir el ritmo de carrera de fondo en 15-20 seg/km.";
     targets.agresivo = "Mejorar un 5% el ritmo promedio del test de 5K.";
@@ -913,7 +999,8 @@ export function generateTrainingPlan(data: OnboardingData): TrainingPlan {
         cooldown,
         physiologicalExplanation,
         fatigueAdaptation,
-        isCompleted: false
+        isCompleted: false,
+        isLongRun: /^Tirada Larga/.test(name)
       });
     }
 

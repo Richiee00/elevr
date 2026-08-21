@@ -6,6 +6,7 @@ import {
   FrequencyOption,
   OnboardingData
 } from "./types";
+import { NEEDS_VAM_OBJECTIVES } from "./engines";
 import {
   ArrowLeft,
   ArrowRight,
@@ -370,25 +371,31 @@ export default function Onboarding({ onComplete, onCancel, stepOffset = 0 }: Onb
                 </div>
               )}
 
-              <div className="bg-white p-4 rounded-2xl border border-zinc-200/80 space-y-2 shadow-sm">
-                <label className="text-xs font-bold uppercase tracking-wider text-zinc-700 flex items-center justify-between gap-2">
-                  <span>Test de VAM (Velocidad Aeróbica Máxima) - Opcional</span>
-                  <span className="text-[9px] bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full font-bold border border-blue-100">
-                    Recomendado
-                  </span>
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={vamTestDistance}
-                  onChange={(e) => setVamTestDistance(cleanNumericInput(e.target.value))}
-                  placeholder="Metros recorridos en 5 minutos (e.g. 1150)"
-                  className="w-full bg-white border border-zinc-200/80 rounded-xl px-4 py-3 text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold"
-                />
-                <p className="text-xs text-zinc-500 leading-relaxed font-medium">
-                  Si has hecho un test de 5 minutos al máximo, introduce la distancia en metros. La app calculará tus zonas con precisión científica de laboratorio.
-                </p>
-              </div>
+              {/* Mi Primer 10K, Mejorar 10K, Mi Primer 21K, Mejorar 21K y Mejorar Ritmo no muestran este
+                  campo aquí: su Test VAM se realiza más adelante, ya con el plan generado (igual que
+                  en Hyrox), y solo entonces se calculan sus objetivos de carrera y zonas de ritmo
+                  reales — nunca a partir de un tiempo introducido que puede ser antiguo. */}
+              {!NEEDS_VAM_OBJECTIVES.has(objective) && (
+                <div className="bg-white p-4 rounded-2xl border border-zinc-200/80 space-y-2 shadow-sm">
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-700 flex items-center justify-between gap-2">
+                    <span>Test de VAM (Velocidad Aeróbica Máxima) - Opcional</span>
+                    <span className="text-[9px] bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full font-bold border border-blue-100">
+                      Recomendado
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={vamTestDistance}
+                    onChange={(e) => setVamTestDistance(cleanNumericInput(e.target.value))}
+                    placeholder="Metros recorridos en 5 minutos (e.g. 1150)"
+                    className="w-full bg-white border border-zinc-200/80 rounded-xl px-4 py-3 text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold"
+                  />
+                  <p className="text-xs text-zinc-500 leading-relaxed font-medium">
+                    Si has hecho un test de 5 minutos al máximo, introduce la distancia en metros. La app calculará tus zonas con precisión científica de laboratorio.
+                  </p>
+                </div>
+              )}
             </div>
           </motion.div>
         )}

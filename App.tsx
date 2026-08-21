@@ -3,9 +3,12 @@ import { motion, AnimatePresence } from "motion/react";
 import {
   OnboardingData,
   TrainingPlan,
-  DailyReadinessInput
+  DailyReadinessInput,
+  RunningObjective,
+  RunningVAMTestResult,
+  WorkoutCompletionRecord
 } from "./types";
-import { generateTrainingPlan } from "./engines";
+import { generateTrainingPlan, calculateTrainingZones, estimateTargetsFromVAM, NEEDS_VAM_OBJECTIVES } from "./engines";
 
 // View components
 import Dashboard from "./Dashboard";
@@ -50,9 +53,10 @@ export default function App({ onSwitchDiscipline, onResetToLanding }: AppProps) 
   const [plan, setPlan] = useState<TrainingPlan | null>(() => loadJSON("run_plan_data", null));
   const [currentWeekIndex, setCurrentWeekIndex] = useState<number>(() => Number(localStorage.getItem("run_plan_current_week") || "0"));
   const [readinessHistory, setReadinessHistory] = useState<Record<string, DailyReadinessInput>>(() => loadJSON("run_plan_readiness", {}));
-  const [completedWorkouts, setCompletedWorkouts] = useState<Record<string, { feedback: string; rpe: number; date: string }>>(() =>
+  const [completedWorkouts, setCompletedWorkouts] = useState<Record<string, WorkoutCompletionRecord>>(() =>
     loadJSON("run_plan_completed_workouts", {})
   );
+  const [vamTest, setVamTest] = useState<RunningVAMTestResult | null>(() => loadJSON("run_plan_vam_test", null));
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -87,18 +91,59 @@ export default function App({ onSwitchDiscipline, onResetToLanding }: AppProps) 
     localStorage.setItem("run_plan_readiness", JSON.stringify(newHistory));
   };
 
-  const handleLogWorkoutCompletion = (workoutId: string, feedback: string, rpe: number) => {
-    const newCompleted = {
+  const handleLogWorkoutCompletion = (
+    workoutId: string,
+    feedback: string,
+    rpe: number,
+    actualDistanceKm?: number,
+    actualTimeSeconds?: number
+  ) => {
+    const newCompleted: Record<string, WorkoutCompletionRecord> = {
       ...completedWorkouts,
       [workoutId]: {
         feedback,
         rpe,
-        date: new Date().toISOString()
+        date: new Date().toISOString(),
+        actualDistanceKm,
+        actualTimeSeconds
       }
     };
 
     setCompletedWorkouts(newCompleted);
     localStorage.setItem("run_plan_completed_workouts", JSON.stringify(newCompleted));
+  };
+
+  const handleSaveVAMTest = (result: RunningVAMTestResult) => {
+    setVamTest(result);
+    localStorage.setItem("run_plan_vam_test", JSON.stringify(result));
+
+    // Mi Primer 10K, Mejorar 10K, Mi Primer 21K, Mejorar 21K y Mejorar Ritmo dependen del Test VAM:
+    // es la única marca de referencia fiable (no un tiempo introducido que puede ser antiguo), así
+    // que solo al completarlo se calculan sus zonas de ritmo y objetivos de carrera reales.
+    if (plan && onboarding && NEEDS_VAM_OBJECTIVES.has(onboarding.objective)) {
+      const zones = calculateTrainingZones({
+        ...onboarding,
+        time10K: undefined,
+        time21K: undefined,
+        vamTestDistance: result.distanceMeters
+      });
+      const raceDistance =
+        onboarding.objective === RunningObjective.PRIMER_21K || onboarding.objective === RunningObjective.MEJORAR_21K
+          ? "21K"
+          : "10K";
+      const { targets, estimatedPaces } = estimateTargetsFromVAM(result.vamKmH, plan.initialDiagnostic.levelEstimated, raceDistance);
+      const updatedPlan: TrainingPlan = {
+        ...plan,
+        zones,
+        initialDiagnostic: {
+          ...plan.initialDiagnostic,
+          targets,
+          estimatedPaces
+        }
+      };
+      setPlan(updatedPlan);
+      localStorage.setItem("run_plan_data", JSON.stringify(updatedPlan));
+    }
   };
 
   const handleResetAll = () => {
@@ -107,6 +152,7 @@ export default function App({ onSwitchDiscipline, onResetToLanding }: AppProps) 
     localStorage.removeItem("run_plan_current_week");
     localStorage.removeItem("run_plan_readiness");
     localStorage.removeItem("run_plan_completed_workouts");
+    localStorage.removeItem("run_plan_vam_test");
     onResetToLanding();
   };
 
@@ -201,6 +247,8 @@ export default function App({ onSwitchDiscipline, onResetToLanding }: AppProps) 
                 plan={plan}
                 activeInjury={onboarding?.activeInjury || false}
                 injuryAreas={onboarding?.injuryAreas || []}
+                vamTest={vamTest}
+                onSaveVAMTest={handleSaveVAMTest}
               />
             </motion.div>
           )}

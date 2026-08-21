@@ -1,5 +1,6 @@
-import React from "react";
-import { TrainingPlan, RunningObjective } from "./types";
+import React, { useState } from "react";
+import { TrainingPlan, RunningObjective, RunningVAMTestResult } from "./types";
+import { NEEDS_VAM_OBJECTIVES } from "./engines";
 import {
   Activity,
   TrendingUp,
@@ -11,17 +12,27 @@ import {
   Flame,
   Calendar,
   Layers,
-  Target
+  Target,
+  Gauge
 } from "lucide-react";
+import RunningVAMTestCard from "./RunningVAMTestCard";
 
 interface DashboardProps {
   plan: TrainingPlan;
   activeInjury: boolean;
   injuryAreas: string[];
+  vamTest: RunningVAMTestResult | null;
+  onSaveVAMTest: (result: RunningVAMTestResult) => void;
 }
 
-export default function Dashboard({ plan, activeInjury, injuryAreas }: DashboardProps) {
+export default function Dashboard({ plan, activeInjury, injuryAreas, vamTest, onSaveVAMTest }: DashboardProps) {
   const { initialDiagnostic, zones } = plan;
+  const [showVamTest, setShowVamTest] = useState(false);
+
+  // Mi Primer 10K no tiene ninguna marca real hasta completar el Test VAM: hasta entonces no se
+  // muestran objetivos de carrera ni zonas de ritmo "calculadas" (serían solo una estimación genérica
+  // por nivel), igual que Hyrox oculta su tiempo objetivo hasta tener un dato de referencia real.
+  const needsVamGate = NEEDS_VAM_OBJECTIVES.has(plan.objective) && !vamTest;
 
   const renderBMIWidget = (bmi: number, category: string) => {
     const pct = Math.max(0, Math.min(100, ((bmi - 15) / (35 - 15)) * 100));
@@ -277,26 +288,55 @@ export default function Dashboard({ plan, activeInjury, injuryAreas }: Dashboard
               </h4>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-4">
-                <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Conservador</p>
-                <p className="text-sm sm:text-base font-black text-zinc-900 mt-1.5 leading-snug">
-                  {initialDiagnostic.targets.conservador}
+            {needsVamGate ? (
+              <>
+                <div className="py-5 text-center">
+                  <p className="text-2xl font-black text-zinc-400 italic">Analizando…</p>
+                </div>
+                <p className="text-xs text-zinc-500 font-medium leading-relaxed mb-4">
+                  Para que sea preciso, no usamos ningún tiempo introducido en el onboarding (puede estar desactualizado). Completa el Test VAM: calcula tu velocidad aeróbica máxima ahora mismo y desbloquea tiempos concretos.
                 </p>
+                {!showVamTest ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowVamTest(true)}
+                    className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase tracking-wider text-[11px] cursor-pointer transition flex items-center justify-center gap-1.5"
+                  >
+                    <Gauge className="w-4 h-4" />
+                    Realizar Test VAM
+                  </button>
+                ) : (
+                  <RunningVAMTestCard
+                    onComplete={result => {
+                      onSaveVAMTest(result);
+                      setShowVamTest(false);
+                    }}
+                    onCancel={() => setShowVamTest(false)}
+                  />
+                )}
+              </>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Conservador</p>
+                  <p className="text-sm sm:text-base font-black text-zinc-900 mt-1.5 leading-snug">
+                    {initialDiagnostic.targets.conservador}
+                  </p>
+                </div>
+                <div className="bg-blue-50/60 border border-blue-200 rounded-2xl p-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-blue-600">Realista</p>
+                  <p className="text-sm sm:text-base font-black text-blue-700 mt-1.5 leading-snug">
+                    {initialDiagnostic.targets.realista}
+                  </p>
+                </div>
+                <div className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Agresivo</p>
+                  <p className="text-sm sm:text-base font-black text-zinc-900 mt-1.5 leading-snug">
+                    {initialDiagnostic.targets.agresivo}
+                  </p>
+                </div>
               </div>
-              <div className="bg-blue-50/60 border border-blue-200 rounded-2xl p-4">
-                <p className="text-xs font-bold uppercase tracking-wider text-blue-600">Realista</p>
-                <p className="text-sm sm:text-base font-black text-blue-700 mt-1.5 leading-snug">
-                  {initialDiagnostic.targets.realista}
-                </p>
-              </div>
-              <div className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-4">
-                <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Agresivo</p>
-                <p className="text-sm sm:text-base font-black text-zinc-900 mt-1.5 leading-snug">
-                  {initialDiagnostic.targets.agresivo}
-                </p>
-              </div>
-            </div>
+            )}
           </div>
 
           <div className="bg-white rounded-2xl p-6 border border-zinc-200/80 shadow-sm">
@@ -307,77 +347,90 @@ export default function Dashboard({ plan, activeInjury, injuryAreas }: Dashboard
               </h4>
             </div>
 
-            <p className="text-xs text-zinc-500 font-medium leading-relaxed mb-5">
-              Cálculos fisiológicos automáticos basados en tu ritmo actual de carrera de{" "}
-              <span className="text-blue-600 font-bold">{zones.paceActual}</span>.
-            </p>
+            {needsVamGate ? (
+              <>
+                <div className="py-5 text-center">
+                  <p className="text-2xl font-black text-zinc-400 italic">Analizando…</p>
+                </div>
+                <p className="text-xs text-zinc-500 font-medium leading-relaxed">
+                  Tus zonas de ritmo reales se calculan al completar el Test VAM, arriba en "Objetivo de Carrera".
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-zinc-500 font-medium leading-relaxed mb-5">
+                  Cálculos fisiológicos automáticos basados en tu ritmo actual de carrera de{" "}
+                  <span className="text-blue-600 font-bold">{zones.paceActual}</span>.
+                </p>
 
-            <div className="bg-zinc-50 border border-zinc-200/80 rounded-xl p-4 mb-5">
-              <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mb-1">
-                Pace de referencia
-              </p>
-              <p className="text-2xl font-black text-blue-600">{zones.paceActual}</p>
-            </div>
+                <div className="bg-zinc-50 border border-zinc-200/80 rounded-xl p-4 mb-5">
+                  <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mb-1">
+                    Pace de referencia
+                  </p>
+                  <p className="text-2xl font-black text-blue-600">{zones.paceActual}</p>
+                </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {zoneItems.filter(item => item.value).map(item => {
-                const colors = getZoneColors(item.label);
-                return (
-                  <div
-                    key={item.label}
-                    className={`${colors.bg} border ${colors.border} rounded-2xl p-4`}
-                  >
-                    <p className={`text-xs font-bold uppercase tracking-wider ${colors.text}`}>
-                      {item.label}
-                    </p>
-                    <p className="text-xl sm:text-2xl font-black text-zinc-900 font-mono mt-1 mb-2 tracking-wide whitespace-nowrap">
-                      {item.value}
-                    </p>
-                    <p className="text-xs text-zinc-500 font-medium leading-relaxed">
-                      {item.desc}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {zoneItems.filter(item => item.value).map(item => {
+                    const colors = getZoneColors(item.label);
+                    return (
+                      <div
+                        key={item.label}
+                        className={`${colors.bg} border ${colors.border} rounded-2xl p-4`}
+                      >
+                        <p className={`text-xs font-bold uppercase tracking-wider ${colors.text}`}>
+                          {item.label}
+                        </p>
+                        <p className="text-xl sm:text-2xl font-black text-zinc-900 font-mono mt-1 mb-2 tracking-wide whitespace-nowrap">
+                          {item.value}
+                        </p>
+                        <p className="text-xs text-zinc-500 font-medium leading-relaxed">
+                          {item.desc}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-5 bg-zinc-50 border border-zinc-200/80 rounded-2xl p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <p className="text-xs font-bold uppercase tracking-wider text-zinc-900">
+                      Glosario de Esfuerzos RPE
                     </p>
                   </div>
-                );
-              })}
-            </div>
 
-            <div className="mt-5 bg-zinc-50 border border-zinc-200/80 rounded-2xl p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <p className="text-xs font-bold uppercase tracking-wider text-zinc-900">
-                  Glosario de Esfuerzos RPE
-                </p>
-              </div>
+                  <div className="space-y-3 text-xs text-zinc-600 font-medium leading-relaxed">
+                    <div className="flex items-start gap-2.5">
+                      <span className="inline-block w-3.5 h-3.5 rounded-full bg-emerald-500 mt-0.5 flex-shrink-0" />
+                      <p>
+                        <span className="font-bold text-zinc-900">RPE 2-4:</span> {zones.rpeDescription?.easy}
+                      </p>
+                    </div>
 
-              <div className="space-y-3 text-xs text-zinc-600 font-medium leading-relaxed">
-                <div className="flex items-start gap-2.5">
-                  <span className="inline-block w-3.5 h-3.5 rounded-full bg-emerald-500 mt-0.5 flex-shrink-0" />
-                  <p>
-                    <span className="font-bold text-zinc-900">RPE 2-4:</span> {zones.rpeDescription?.easy}
-                  </p>
+                    <div className="flex items-start gap-2.5">
+                      <span className="inline-block w-3.5 h-3.5 rounded-full bg-amber-500 mt-0.5 flex-shrink-0" />
+                      <p>
+                        <span className="font-bold text-zinc-900">RPE 5-6:</span> {zones.rpeDescription?.aerobic}
+                      </p>
+                    </div>
+
+                    <div className="flex items-start gap-2.5">
+                      <span className="inline-block w-3.5 h-3.5 rounded-full bg-orange-500 mt-0.5 flex-shrink-0" />
+                      <p>
+                        <span className="font-bold text-zinc-900">RPE 7-8:</span> {zones.rpeDescription?.tempo}
+                      </p>
+                    </div>
+
+                    <div className="flex items-start gap-2.5">
+                      <span className="inline-block w-3.5 h-3.5 rounded-full bg-rose-500 mt-0.5 flex-shrink-0" />
+                      <p>
+                        <span className="font-bold text-zinc-900">RPE 9-10:</span> {zones.rpeDescription?.series}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-
-                <div className="flex items-start gap-2.5">
-                  <span className="inline-block w-3.5 h-3.5 rounded-full bg-amber-500 mt-0.5 flex-shrink-0" />
-                  <p>
-                    <span className="font-bold text-zinc-900">RPE 5-6:</span> {zones.rpeDescription?.aerobic}
-                  </p>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <span className="inline-block w-3.5 h-3.5 rounded-full bg-orange-500 mt-0.5 flex-shrink-0" />
-                  <p>
-                    <span className="font-bold text-zinc-900">RPE 7-8:</span> {zones.rpeDescription?.tempo}
-                  </p>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <span className="inline-block w-3.5 h-3.5 rounded-full bg-rose-500 mt-0.5 flex-shrink-0" />
-                  <p>
-                    <span className="font-bold text-zinc-900">RPE 9-10:</span> {zones.rpeDescription?.series}
-                  </p>
-                </div>
-              </div>
-            </div>
+              </>
+            )}
           </div>
         </div>
       </div>

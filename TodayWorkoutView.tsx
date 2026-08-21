@@ -1,14 +1,16 @@
 import React, { useState } from "react";
 import { motion } from "motion/react";
-import { 
-  TrainingPlan, 
-  DailyReadinessInput, 
-  WorkoutSession, 
-  DailyReadinessScore 
+import {
+  TrainingPlan,
+  DailyReadinessInput,
+  WorkoutSession,
+  DailyReadinessScore,
+  WorkoutCompletionRecord
 } from "./types";
-import { 
-  runDailyExecutionEngine, 
-  calculateReadiness 
+import {
+  runDailyExecutionEngine,
+  calculateReadiness,
+  parseTimeToSeconds
 } from "./engines";
 import { 
   Activity, 
@@ -118,8 +120,8 @@ interface TodayWorkoutViewProps {
   currentWeekIndex?: number;
   readiness: DailyReadinessInput | undefined;
   onSaveReadiness: (input: DailyReadinessInput) => void;
-  onLogWorkoutCompletion: (workoutId: string, feedback: string, rpe: number) => void;
-  completedWorkouts: Record<string, { feedback: string; rpe: number; date: string }>;
+  onLogWorkoutCompletion: (workoutId: string, feedback: string, rpe: number, actualDistanceKm?: number, actualTimeSeconds?: number) => void;
+  completedWorkouts: Record<string, WorkoutCompletionRecord>;
   activeInjury: boolean;
   injuryAreas: string[];
 }
@@ -146,6 +148,8 @@ export default function TodayWorkoutView({
   // Completion logging states
   const [feedback, setFeedback] = useState<string>("adecuado");
   const [loggedRpe, setLoggedRpe] = useState<number>(5);
+  const [actualDistanceKm, setActualDistanceKm] = useState<string>("");
+  const [actualTime, setActualTime] = useState<string>("");
 
   // Session steps tracking state: preview, questionnaire, adapted, executing, feedback
   const [sessionSteps, setSessionSteps] = useState<Record<string, "preview" | "questionnaire" | "adapted" | "executing" | "feedback">>({});
@@ -1267,11 +1271,53 @@ export default function TodayWorkoutView({
                       </div>
                     </div>
 
+                    {session.isLongRun && (
+                      <div className="bg-blue-50/60 border border-blue-200 rounded-xl p-4 space-y-3">
+                        <p className="text-xs text-blue-900 font-medium leading-relaxed">
+                          Esta es tu tirada larga aeróbica. Registra el resultado real: la app la usará para recalcular tu predictor de marcas en el Perfil.
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block font-sans">Distancia recorrida (km)</label>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={actualDistanceKm}
+                              onChange={(e) => setActualDistanceKm(e.target.value.replace(/[^0-9.,]/g, ""))}
+                              placeholder="Ej. 8"
+                              className="w-full bg-white border border-zinc-200/80 rounded-lg px-3 py-2.5 text-xs text-zinc-900 focus:outline-none focus:border-blue-600 font-bold font-mono"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block font-sans">Tiempo total invertido (hh:mm:ss)</label>
+                            <input
+                              type="text"
+                              value={actualTime}
+                              onChange={(e) => setActualTime(e.target.value)}
+                              placeholder="Ej. 45:30"
+                              className="w-full bg-white border border-zinc-200/80 rounded-lg px-3 py-2.5 text-xs text-zinc-900 focus:outline-none focus:border-blue-600 font-bold font-mono"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex justify-end pt-2">
                       <button
                         type="button"
                         onClick={() => {
-                          onLogWorkoutCompletion(session.id, feedback, loggedRpe);
+                          const distNum = Number(actualDistanceKm.replace(",", "."));
+                          const timeSecs = parseTimeToSeconds(actualTime);
+                          const hasActualResult = session.isLongRun && distNum > 0 && timeSecs > 0;
+                          onLogWorkoutCompletion(
+                            session.id,
+                            feedback,
+                            loggedRpe,
+                            hasActualResult ? distNum : undefined,
+                            hasActualResult ? timeSecs : undefined
+                          );
+                          setActualDistanceKm("");
+                          setActualTime("");
                           setSelectedSessionId(defaultWorkout.id);
                           window.scrollTo({ top: 0, behavior: "smooth" });
                         }}

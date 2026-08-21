@@ -79,6 +79,7 @@ export interface WorkoutSession {
   isCompleted: boolean;
   feedback?: "perfecto" | "adecuado" | "muy_duro" | "facil" | "incompleto" | "no_realizado";
   rpeGiven?: number; // 1-10
+  isLongRun?: boolean; // Tirada larga aeróbica: habilita el registro de resultado real para recalcular el predictor de marcas.
 }
 
 export interface WeeklyPlan {
@@ -147,11 +148,26 @@ export interface AdaptedWorkoutResult {
   recoveryRecommendation: string;
 }
 
+export interface WorkoutCompletionRecord {
+  feedback: string;
+  rpe: number;
+  date: string;
+  actualDistanceKm?: number; // Solo para sesiones isLongRun: distancia realmente recorrida.
+  actualTimeSeconds?: number; // Solo para sesiones isLongRun: tiempo total invertido.
+}
+
+export interface RunningVAMTestResult {
+  distanceMeters: number;
+  vamKmH: number;
+  vamPaceMinKm: string;
+  completedAt: string;
+}
+
 export interface AppState {
   onboarding: OnboardingData | null;
   plan: TrainingPlan | null;
   currentWeekIndex: number;
   readinessHistory: Record<string, DailyReadinessInput>; // Key: YYYY-MM-DD
-  completedWorkouts: Record<string, { feedback: string; rpe: number; date: string }>; // Key: workoutId
+  completedWorkouts: Record<string, WorkoutCompletionRecord>; // Key: workoutId
   activeTab: "landing" | "onboarding" | "dashboard" | "plan" | "today" | "readiness" | "settings";
 }
