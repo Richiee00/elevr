@@ -858,9 +858,18 @@ export function generateTrainingPlan(data: OnboardingData, vamKmH: number): Trai
   // calibrar el ritmo de entrenamiento diario (para eso, el VAM es la única fuente).
   let targets = { conservador: "", realista: "", agresivo: "" };
   if (data.objective === RunningObjective.PRIMER_10K) {
-    targets.conservador = "Completar la distancia corriendo de forma continua.";
-    targets.realista = "Completar los 10K sintiendo control y con RPE <6.";
-    targets.agresivo = "Acercarse a un tiempo sub-60 minutos.";
+    // Objetivo numérico basado en el VAM (nunca en un tiempo autoreportado): conservador añade un
+    // margen de seguridad por ser su primera vez en la distancia (pacing, fatiga, gestión del esfuerzo).
+    const baseSecs10K = parseTimeToSeconds(estimatedPaces["10K"]);
+    const spread10KDebut =
+      levelEstimated === "Principiante"
+        ? { conservador: 0.08, agresivo: 0.03 }
+        : levelEstimated === "Intermedio"
+        ? { conservador: 0.06, agresivo: 0.04 }
+        : { conservador: 0.04, agresivo: 0.05 };
+    targets.conservador = formatSecondsToTime(baseSecs10K * (1 + spread10KDebut.conservador));
+    targets.realista = formatSecondsToTime(baseSecs10K);
+    targets.agresivo = formatSecondsToTime(baseSecs10K * (1 - spread10KDebut.agresivo));
   } else if (data.objective === RunningObjective.MEJORAR_10K && data.time10K) {
     // Mejora realista 10K, plan de 8 semanas (cerebro): valores fijos, no un rango calculado.
     const totalSecs = parseTimeToSeconds(data.time10K);
@@ -874,9 +883,19 @@ export function generateTrainingPlan(data: OnboardingData, vamKmH: number): Trai
     targets.realista = formatSecondsToTime(totalSecs * (1 - pct10K.realista));
     targets.agresivo = formatSecondsToTime(totalSecs * (1 - pct10K.agresivo));
   } else if (data.objective === RunningObjective.PRIMER_21K) {
-    targets.conservador = "Cruzar la meta corriendo y sin lesiones.";
-    targets.realista = "Correr cómodamente, con tiempo estimado de: " + (estimatedPaces["21K"] || "2:05:00");
-    targets.agresivo = "Lograr una marca por debajo de 2 horas.";
+    // Igual que en el primer 10K: objetivo numérico basado en el VAM, con un margen de seguridad
+    // mayor que en el 10K porque el riesgo de "pájara" (gestión de esfuerzo, nutrición) es más alto
+    // en la primera media maratón.
+    const baseSecs21K = parseTimeToSeconds(estimatedPaces["21K"]);
+    const spread21KDebut =
+      levelEstimated === "Principiante"
+        ? { conservador: 0.12, agresivo: 0.03 }
+        : levelEstimated === "Intermedio"
+        ? { conservador: 0.09, agresivo: 0.04 }
+        : { conservador: 0.06, agresivo: 0.05 };
+    targets.conservador = formatSecondsToTime(baseSecs21K * (1 + spread21KDebut.conservador));
+    targets.realista = formatSecondsToTime(baseSecs21K);
+    targets.agresivo = formatSecondsToTime(baseSecs21K * (1 - spread21KDebut.agresivo));
   } else if (data.objective === RunningObjective.MEJORAR_21K && data.time21K) {
     // Mejora realista 21K, plan de 12 semanas (cerebro): valores fijos, no un rango calculado.
     const totalSecs = parseTimeToSeconds(data.time21K);
