@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { TrainingPlan, WorkoutSession, WeeklyPlan, DailyReadinessInput, DailyReadinessScore, WorkoutCompletionRecord } from "./types";
-import { calculateReadiness, runDailyExecutionEngine, formatDateEU, parseTimeToSeconds } from "./engines";
+import { TrainingPlan, WorkoutSession, WeeklyPlan, DailyReadinessInput, DailyReadinessScore } from "./types";
+import { calculateReadiness, runDailyExecutionEngine, formatDateEU } from "./engines";
 import { 
   Calendar, 
   Dumbbell, 
@@ -106,8 +106,8 @@ interface WeeklyPlanViewProps {
   plan: TrainingPlan;
   currentWeekIndex: number;
   onSetCurrentWeek: (idx: number) => void;
-  onLogWorkoutCompletion: (workoutId: string, feedback: string, rpe: number, actualDistanceKm?: number, actualTimeSeconds?: number) => void;
-  completedWorkouts: Record<string, WorkoutCompletionRecord>;
+  onLogWorkoutCompletion: (workoutId: string, feedback: string, rpe: number) => void;
+  completedWorkouts: Record<string, { feedback: string; rpe: number; date: string }>;
   readiness?: DailyReadinessInput;
   onSaveReadiness?: (input: DailyReadinessInput) => void;
   activeInjury?: boolean;
@@ -148,8 +148,6 @@ export default function WeeklyPlanView({
   // Feedback form states
   const [selectedFeedback, setSelectedFeedback] = useState<string>("adecuado");
   const [selectedRpe, setSelectedRpe] = useState<number>(5);
-  const [actualDistanceKm, setActualDistanceKm] = useState<string>("");
-  const [actualTime, setActualTime] = useState<string>("");
 
   const getLocalDateString = (dateInput: string | Date) => {
     const d = new Date(dateInput);
@@ -611,6 +609,11 @@ export default function WeeklyPlanView({
                   <div className="min-w-0">
                     <div className="flex items-center flex-wrap gap-2 mb-1">
                       {getSessionTypeBadge(session.type)}
+                      {session.isVamRetest && !isCompleted && (
+                        <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-[8px] font-bold rounded-md uppercase tracking-wider border border-amber-200">
+                          Test VAM
+                        </span>
+                      )}
                       {isCompleted && (
                         <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[8px] font-bold rounded-md uppercase tracking-wider flex items-center gap-0.5 border border-emerald-200">
                           <CheckCircle className="w-2.5 h-2.5" /> Completado
@@ -1248,53 +1251,11 @@ export default function WeeklyPlanView({
                               </div>
                             </div>
 
-                            {session.isLongRun && (
-                              <div className="bg-blue-50/60 border border-blue-200 rounded-xl p-4 space-y-3">
-                                <p className="text-xs text-blue-900 font-medium leading-relaxed">
-                                  Esta es tu tirada larga aeróbica. Registra el resultado real: la app la usará para recalcular tu predictor de marcas en el Perfil.
-                                </p>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                  <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block font-sans">Distancia recorrida (km)</label>
-                                    <input
-                                      type="text"
-                                      inputMode="decimal"
-                                      value={actualDistanceKm}
-                                      onChange={(e) => setActualDistanceKm(e.target.value.replace(/[^0-9.,]/g, ""))}
-                                      placeholder="Ej. 8"
-                                      className="w-full bg-white border border-zinc-200/80 rounded-lg px-3 py-2.5 text-xs text-zinc-900 focus:outline-none focus:border-blue-600 font-bold font-mono"
-                                    />
-                                  </div>
-                                  <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block font-sans">Tiempo total invertido (hh:mm:ss)</label>
-                                    <input
-                                      type="text"
-                                      value={actualTime}
-                                      onChange={(e) => setActualTime(e.target.value)}
-                                      placeholder="Ej. 45:30"
-                                      className="w-full bg-white border border-zinc-200/80 rounded-lg px-3 py-2.5 text-xs text-zinc-900 focus:outline-none focus:border-blue-600 font-bold font-mono"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
                             <div className="flex justify-end pt-2">
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const distNum = Number(actualDistanceKm.replace(",", "."));
-                                  const timeSecs = parseTimeToSeconds(actualTime);
-                                  const hasActualResult = session.isLongRun && distNum > 0 && timeSecs > 0;
-                                  onLogWorkoutCompletion(
-                                    session.id,
-                                    selectedFeedback,
-                                    selectedRpe,
-                                    hasActualResult ? distNum : undefined,
-                                    hasActualResult ? timeSecs : undefined
-                                  );
-                                  setActualDistanceKm("");
-                                  setActualTime("");
+                                  onLogWorkoutCompletion(session.id, selectedFeedback, selectedRpe);
                                   setSessionSteps(prev => ({ ...prev, [session.id]: "preview" }));
                                   setActiveExecutingSessionId(null);
                                 }}

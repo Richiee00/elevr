@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { motion } from "motion/react";
-import { OnboardingData, RunningObjective, TrainingPlan, WorkoutCompletionRecord } from "./types";
+import { OnboardingData, RunningObjective, TrainingPlan } from "./types";
 import {
   User,
   Scale,
@@ -16,26 +16,14 @@ import {
   Flame,
   Dumbbell
 } from "lucide-react";
-import { calculateBMI, recalculateMarksFromResult, formatSecondsToTime } from "./engines";
+import { calculateBMI } from "./engines";
 
 interface ProfileViewProps {
   onboarding: OnboardingData;
   plan: TrainingPlan;
   onUpdateProfile: (updated: OnboardingData) => void;
-  completedWorkouts: Record<string, WorkoutCompletionRecord>;
+  completedWorkouts: Record<string, { feedback: string; rpe: number; date: string }>;
 }
-
-// Semanas cuya tirada larga aeróbica, una vez completada con resultado real, recalcula el predictor
-// de marcas (fórmula de Riegel). Ninguno de estos 5 objetivos tiene ninguna marca real de partida
-// (nunca se parte de un tiempo introducido, que puede ser antiguo): el primer cálculo siempre llega
-// con la tirada larga de la semana 1, y se va recalculando en checkpoints posteriores.
-const PREDICTOR_CHECKPOINT_WEEKS: Partial<Record<RunningObjective, number[]>> = {
-  [RunningObjective.PRIMER_10K]: [1, 5],
-  [RunningObjective.MEJORAR_10K]: [1, 5],
-  [RunningObjective.PRIMER_21K]: [1, 5, 9],
-  [RunningObjective.MEJORAR_21K]: [1, 5, 9],
-  [RunningObjective.MEJORAR_RITMO]: [1, 5]
-};
 
 export default function ProfileView({ onboarding, plan, onUpdateProfile, completedWorkouts }: ProfileViewProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -106,46 +94,14 @@ export default function ProfileView({ onboarding, plan, onUpdateProfile, complet
     }
   };
 
-  const predictorSource = useMemo(() => {
-    const checkpointWeeks = PREDICTOR_CHECKPOINT_WEEKS[onboarding.objective] || [];
-    // Usar el checkpoint disponible más reciente (semana más alta con resultado real registrado).
-    const sortedDesc = [...checkpointWeeks].sort((a, b) => b - a);
-    for (const weekNumber of sortedDesc) {
-      const week = plan.weeks[weekNumber - 1];
-      if (!week) continue;
-      const longRunSession = week.sessions.find(s => s.isLongRun);
-      if (!longRunSession) continue;
-      const record = completedWorkouts[longRunSession.id];
-      if (record && record.actualDistanceKm && record.actualTimeSeconds) {
-        return {
-          estimatedPaces: recalculateMarksFromResult(record.actualDistanceKm, record.actualTimeSeconds),
-          note: `Recalculado con tu tirada larga real de la semana ${weekNumber}: ${record.actualDistanceKm} km en ${formatSecondsToTime(record.actualTimeSeconds)}.`
-        };
-      }
-    }
+  const estimatedPaces = plan.initialDiagnostic.estimatedPaces;
 
-    if (checkpointWeeks.length > 0) {
-      // Objetivo gateado por Test VAM/tirada larga real: sin ningún checkpoint completado todavía
-      // no se muestra ningún número (nunca una estimación basada en un tiempo introducido antiguo).
-      return null;
-    }
-
-    // Objetivos sin checkpoints de tirada larga (p. ej. Mejorar Resistencia): mantienen el cálculo
-    // inicial de onboarding, sin necesidad de resultado real.
-    return {
-      estimatedPaces: plan.initialDiagnostic.estimatedPaces,
-      note: "Estimaciones calculadas mediante la fórmula de fatiga aeróbica de Riegel en base a tus datos de onboarding."
-    };
-  }, [onboarding.objective, plan.weeks, plan.initialDiagnostic.estimatedPaces, completedWorkouts]);
-
-  const predictorItems = predictorSource
-    ? [
-        { label: "Distancia 5K", value: predictorSource.estimatedPaces["5K"] || "--:--" },
-        { label: "Distancia 10K", value: predictorSource.estimatedPaces["10K"] || "--:--" },
-        { label: "Media Maratón (21.1K)", value: predictorSource.estimatedPaces["21K"] || "--:--" },
-        { label: "Maratón Completa (42.2K)", value: predictorSource.estimatedPaces["42K"] || "--:--" }
-      ]
-    : [];
+  const predictorItems = [
+    { label: "Distancia 5K", value: estimatedPaces["5K"] || "24:30" },
+    { label: "Distancia 10K", value: estimatedPaces["10K"] || "51:00" },
+    { label: "Media Maratón (21.1K)", value: estimatedPaces["21K"] || "01:54:30" },
+    { label: "Maratón Completa (42.2K)", value: estimatedPaces["42K"] || "04:05:00" }
+  ];
 
   const stats = useMemo(() => {
     const isWeekFullyCompleted = (weekIndex: number) => {
@@ -414,32 +370,24 @@ export default function ProfileView({ onboarding, plan, onUpdateProfile, complet
         </div>
 
         <p className="text-xs text-zinc-500 font-medium leading-relaxed font-sans">
-          {predictorSource
-            ? predictorSource.note
-            : "Aún no calculado: se calculará en base a tu tirada larga aeróbica real de la semana 1, una vez la registres como completada."}
+          Estimaciones calculadas mediante la fórmula de fatiga aeróbica de Riegel en base a tus datos de onboarding.
         </p>
 
-        {predictorSource ? (
-          <div className="space-y-3 font-sans">
-            {predictorItems.map(item => (
-              <div
-                key={item.label}
-                className="flex items-center justify-between gap-4 border-b border-zinc-100 pb-3 last:border-b-0 last:pb-0"
-              >
-                <span className="text-xs text-zinc-700 font-medium">
-                  {item.label}
-                </span>
-                <span className="px-3 py-1 rounded-lg bg-blue-50 text-blue-600 font-bold text-xs font-mono border border-blue-200">
-                  {item.value}
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="py-6 text-center">
-            <p className="text-lg font-black text-zinc-400 italic">Analizando…</p>
-          </div>
-        )}
+        <div className="space-y-3 font-sans">
+          {predictorItems.map(item => (
+            <div
+              key={item.label}
+              className="flex items-center justify-between gap-4 border-b border-zinc-100 pb-3 last:border-b-0 last:pb-0"
+            >
+              <span className="text-xs text-zinc-700 font-medium">
+                {item.label}
+              </span>
+              <span className="px-3 py-1 rounded-lg bg-blue-50 text-blue-600 font-bold text-xs font-mono border border-blue-200">
+                {item.value}
+              </span>
+            </div>
+          ))}
+        </div>
 
         <div className="bg-zinc-50/80 border border-zinc-200/80 rounded-xl p-4 flex items-start gap-3">
           <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />

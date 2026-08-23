@@ -12,17 +12,6 @@ import {
   AdaptedWorkoutResult
 } from "./types";
 
-// Objetivos cuyos objetivos de carrera y zonas de ritmo "calculadas" dependen exclusivamente del
-// Test VAM (no de un tiempo de 10K/21K introducido por el usuario, que puede ser antiguo y no
-// reflejar su forma física actual). Hasta que no completan el test no se muestra ningún número.
-export const NEEDS_VAM_OBJECTIVES = new Set<RunningObjective>([
-  RunningObjective.PRIMER_10K,
-  RunningObjective.MEJORAR_10K,
-  RunningObjective.PRIMER_21K,
-  RunningObjective.MEJORAR_21K,
-  RunningObjective.MEJORAR_RITMO
-]);
-
 // ============================================================================
 // HELPER FUNCTIONS FOR PACE AND TIME MANIPULATION
 // ============================================================================
@@ -45,7 +34,7 @@ export function formatSecondsToTime(totalSecs: number): string {
   const h = Math.floor(totalSecs / 3600);
   const m = Math.floor((totalSecs % 3600) / 60);
   const s = Math.round(totalSecs % 60);
-  
+
   if (h > 0) {
     return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   }
@@ -79,110 +68,6 @@ export function formatDateEU(dateInput: string | Date): string {
 }
 
 // ============================================================================
-// TEST VAM (RUNNING): protocolo de 5 minutos a máximo esfuerzo sostenible.
-// ============================================================================
-
-export const RUNNING_VAM_TEST_DURATION_MIN = 5;
-
-export function calculateVAMFromRunningTest(distanceMeters: number): { vamKmH: number; vamPaceMinKm: string } {
-  const km = distanceMeters / 1000;
-  const hours = RUNNING_VAM_TEST_DURATION_MIN / 60;
-  const vamKmh = hours > 0 ? km / hours : 0;
-  const paceSecsPerKm = vamKmh > 0 ? 3600 / vamKmh : 0;
-  return { vamKmH: Math.round(vamKmh * 10) / 10, vamPaceMinKm: paceSecsPerKm > 0 ? secondsToPace(paceSecsPerKm) : "--:--" };
-}
-
-// ============================================================================
-// PREDICTOR DE MARCAS (fórmula de Riegel) a partir de una referencia directa
-// (distancia real recorrida + tiempo real invertido), reutilizable tanto para
-// el cálculo inicial por onboarding como para el recálculo con resultados reales.
-// ============================================================================
-
-export function recalculateMarksFromResult(referenceDistanceKm: number, referenceSecs: number): Record<string, string> {
-  if (!referenceDistanceKm || !referenceSecs) {
-    return { "5K": "--:--", "10K": "--:--", "21K": "--:--", "42K": "--:--" };
-  }
-  const predictTime = (targetDist: number): string => {
-    const secs = referenceSecs * Math.pow(targetDist / referenceDistanceKm, 1.06);
-    return formatSecondsToTime(secs);
-  };
-  return {
-    "5K": predictTime(5),
-    "10K": predictTime(10),
-    "21K": predictTime(21.1),
-    "42K": predictTime(42.2)
-  };
-}
-
-// ============================================================================
-// OBJETIVOS DE CARRERA CONCRETOS (conservador/realista/agresivo) a partir de un
-// tiempo de referencia y el nivel estimado. Mismas tablas de mejora que usa el
-// cerebro para "Mejorar 10K"/"Mejorar 21K"; reutilizadas por cualquier objetivo
-// que necesite objetivos numéricos derivados de un tiempo base (real o predicho).
-// ============================================================================
-
-export function computeConcrete10KTargets(
-  totalSecs: number,
-  levelEstimated: "Principiante" | "Intermedio" | "Avanzado"
-): { conservador: string; realista: string; agresivo: string } {
-  const pct10K =
-    levelEstimated === "Principiante"
-      ? { conservador: 0.04, realista: 0.05, agresivo: 0.07 }
-      : levelEstimated === "Intermedio"
-      ? { conservador: 0.03, realista: 0.035, agresivo: 0.04 }
-      : { conservador: 0.01, realista: 0.015, agresivo: 0.03 };
-  return {
-    conservador: formatSecondsToTime(totalSecs * (1 - pct10K.conservador)),
-    realista: formatSecondsToTime(totalSecs * (1 - pct10K.realista)),
-    agresivo: formatSecondsToTime(totalSecs * (1 - pct10K.agresivo))
-  };
-}
-
-export function computeConcrete21KTargets(
-  totalSecs: number,
-  levelEstimated: "Principiante" | "Intermedio" | "Avanzado"
-): { conservador: string; realista: string; agresivo: string } {
-  const pct21K =
-    levelEstimated === "Principiante"
-      ? { conservador: 0.04, realista: 0.05, agresivo: 0.07 }
-      : levelEstimated === "Intermedio"
-      ? { conservador: 0.03, realista: 0.04, agresivo: 0.05 }
-      : { conservador: 0.015, realista: 0.02, agresivo: 0.03 };
-  return {
-    conservador: formatSecondsToTime(totalSecs * (1 - pct21K.conservador)),
-    realista: formatSecondsToTime(totalSecs * (1 - pct21K.realista)),
-    agresivo: formatSecondsToTime(totalSecs * (1 - pct21K.agresivo))
-  };
-}
-
-function classifyLevelFrom10KPace(time10K: string | undefined): "Principiante" | "Intermedio" | "Avanzado" {
-  const paceSec = parseTimeToSeconds(time10K || "55:00") / 10;
-  if (paceSec > 360) return "Principiante";
-  if (paceSec >= 270) return "Intermedio";
-  return "Avanzado";
-}
-
-// Ninguno de los 5 objetivos gateados por VAM tiene una marca real de referencia hasta que se
-// completa el Test VAM (nunca a partir de un tiempo introducido, que puede ser antiguo). Una vez
-// hecho el test, se estima un 10K equivalente al 85% del VAM (misma referencia que el resto de la
-// app) y sobre esa base se aplican las mismas tablas de mejora que Mejorar 10K/21K, según el
-// objetivo sea sobre distancia de 10K o de 21K.
-export function estimateTargetsFromVAM(
-  vamKmH: number,
-  levelEstimated: "Principiante" | "Intermedio" | "Avanzado",
-  raceDistance: "10K" | "21K"
-): { targets: { conservador: string; realista: string; agresivo: string }; estimatedPaces: Record<string, string> } {
-  const est10KSpeed = vamKmH * 0.85;
-  const totalSecs10K = est10KSpeed > 0 ? (10 / est10KSpeed) * 3600 : 0;
-  const estimatedPaces = recalculateMarksFromResult(10, totalSecs10K);
-  const targets =
-    raceDistance === "21K"
-      ? computeConcrete21KTargets(parseTimeToSeconds(estimatedPaces["21K"]), levelEstimated)
-      : computeConcrete10KTargets(totalSecs10K, levelEstimated);
-  return { targets, estimatedPaces };
-}
-
-// ============================================================================
 // MÓDULO 1 & 6: CALCULO DE READINESS Y COMPOSICIÓN CORPORAL
 // ============================================================================
 
@@ -194,7 +79,7 @@ export function calculateBMI(weight: number, heightCm: number): { bmi: number; c
   if (bmi < 18.5) category = "Bajo peso";
   else if (bmi >= 25 && bmi < 30) category = "Sobrepeso";
   else if (bmi >= 30) category = "Obesidad";
-  
+
   return { bmi: Math.round(bmi * 10) / 10, category };
 }
 
@@ -233,11 +118,11 @@ export function calculateReadiness(input: DailyReadinessInput, history3DaysLess5
   else if (input.prevRPE === 10) rpeScore = 40;
 
   // Readiness calculation
-  let readiness = 
-    (sleepScore * 0.30) + 
-    (fatigueScore * 0.25) + 
-    (stressScore * 0.20) + 
-    (soreScore * 0.15) + 
+  let readiness =
+    (sleepScore * 0.30) +
+    (fatigueScore * 0.25) +
+    (stressScore * 0.20) +
+    (soreScore * 0.15) +
     (rpeScore * 0.10);
 
   // Extreme cases constraints
@@ -255,7 +140,7 @@ export function calculateReadiness(input: DailyReadinessInput, history3DaysLess5
 
   // State determination
   let state: "PROGRESAR" | "NORMAL" | "ADAPTAR" | "RECOVERY" | "DESCANSO" = "NORMAL";
-  
+
   if (history3DaysLess50) {
     state = "RECOVERY";
   } else if (readiness >= 85) {
@@ -335,21 +220,21 @@ export function detectLimitant(data: OnboardingData): {
 }
 
 // ============================================================================
-// MÓDULO 8 & 9: PROBABILIDAD DE ÉXITO Y PREDICTOR DE MARCAS
+// MÓDULO 8: PROBABILIDAD DE ÉXITO
 // ============================================================================
 
 export function estimateSuccessProbability(data: OnboardingData): "Muy Alta" | "Alta" | "Media" | "Baja" {
   let score = 70; // start neutral
-  
+
   if (data.activeInjury) score -= 25;
   if (data.injuryAreas.length > 0) score -= 10;
-  
+
   if (data.frequency === FrequencyOption.FREQ_4_2 || data.frequency === FrequencyOption.FREQ_5_2) score += 15;
   if (data.frequency === FrequencyOption.FREQ_2_2) score -= 10;
-  
+
   if (data.objective === RunningObjective.PRIMER_10K && data.experienceLevel === ExperienceLevel.AVANZADO_5K) score += 15;
   if (data.objective === RunningObjective.PRIMER_10K && data.experienceLevel === ExperienceLevel.PRINCIPIANTE_ZERO) score -= 5;
-  
+
   const bmi = data.weight / ((data.height / 100) * (data.height / 100));
   if (bmi > 27) score -= 10;
   if (bmi >= 19 && bmi <= 24) score += 10;
@@ -360,80 +245,56 @@ export function estimateSuccessProbability(data: OnboardingData): "Muy Alta" | "
   return "Baja";
 }
 
-export function predictMarks(data: OnboardingData): Record<string, string> {
-  // Mi Primer 10K, Mejorar 10K, Mi Primer 21K, Mejorar 21K y Mejorar Ritmo no tienen ninguna marca
-  // real todavía: el predictor se calcula más adelante a partir del resultado real de la tirada
-  // larga aeróbica (ver checkpoints por semana en ProfileView), nunca desde un tiempo introducido
-  // que puede ser antiguo y ya no reflejar la forma física actual del usuario.
-  if (NEEDS_VAM_OBJECTIVES.has(data.objective)) {
-    return { "5K": "--:--", "10K": "--:--", "21K": "--:--", "42K": "--:--" };
-  }
+// ============================================================================
+// TEST DE VAM (Módulo 9 y 10 del RUNNING_AI_DECISION_ENGINE)
+// Test estándar de RUNNING_VAM_TEST_DURATION_MIN minutos a máximo esfuerzo sostenible.
+// Única fuente de los ritmos de entrenamiento: obligatorio antes de generar el plan y se repite
+// cada 4 semanas (última carrera de cada semana de descarga) para no entrenar con datos desfasados.
+// ============================================================================
 
-  let referenceSecs = 0;
-  let referenceDistance = 0;
+export const RUNNING_VAM_TEST_DURATION_MIN = 6;
 
-  if (data.time10K) {
-    referenceSecs = parseTimeToSeconds(data.time10K);
-    referenceDistance = 10;
-  } else if (data.time21K) {
-    referenceSecs = parseTimeToSeconds(data.time21K);
-    referenceDistance = 21.1;
-  } else if (data.vamTestDistance) {
-    // Test VAM de 5 minutos. Estimar 10K al 85% del VAM (misma referencia que calculateTrainingZones).
-    const { vamKmH } = calculateVAMFromRunningTest(data.vamTestDistance);
-    const est10KSpeed = vamKmH * 0.85;
-    referenceSecs = est10KSpeed > 0 ? (10 / est10KSpeed) * 3600 : 0;
-    referenceDistance = 10;
-  } else {
-    // Standard defaults based on objective/experience
-    if (data.experienceLevel === ExperienceLevel.PRINCIPIANTE_ZERO) {
-      referenceSecs = 70 * 60; // 1h 10m for 10K
-    } else if (data.experienceLevel === ExperienceLevel.INTERMEDIO_2K) {
-      referenceSecs = 58 * 60; // 58m for 10K
-    } else {
-      referenceSecs = 50 * 60; // 50m for 10K
-    }
-    referenceDistance = 10;
-  }
-
-  return recalculateMarksFromResult(referenceDistance, referenceSecs);
+export function calculateVAMFromTest(distanceMeters: number): { vamKmH: number; vamPaceMinKm: string } {
+  const km = distanceMeters / 1000;
+  const hours = RUNNING_VAM_TEST_DURATION_MIN / 60;
+  const vamKmH = hours > 0 ? km / hours : 0;
+  const paceSecPerKm = vamKmH > 0 ? 3600 / vamKmH : 0;
+  return { vamKmH: Math.round(vamKmH * 100) / 100, vamPaceMinKm: secondsToPace(paceSecPerKm) };
 }
 
 // ============================================================================
-// CALCULATE TRAINING PACE ZONES
+// MÓDULO 9: PREDICTOR DE MARCAS
 // ============================================================================
 
-export function calculateTrainingZones(data: OnboardingData): TrainingZones {
-  let basePaceSecs = 330; // default 5:30/km
-  let hasData = false;
+export function predictMarks(vamKmH: number): Record<string, string> {
+  // Ritmo base equivalente a 10K: 85% de la velocidad VAM (misma referencia que calculateTrainingZones,
+  // sin dos porcentajes distintos para el mismo concepto).
+  const est10KSpeed = vamKmH * 0.85;
+  const referenceSecs = est10KSpeed > 0 ? (10 / est10KSpeed) * 3600 : 0;
+  const referenceDistance = 10;
 
-  if (data.time10K) {
-    const totalSecs = parseTimeToSeconds(data.time10K);
-    basePaceSecs = totalSecs / 10;
-    hasData = true;
-  } else if (data.time21K) {
-    const totalSecs = parseTimeToSeconds(data.time21K);
-    // Pace 21K + estimate 10k pace (about 21K pace - 20 seconds)
-    basePaceSecs = (totalSecs / 21.1) - 20;
-    hasData = true;
-  } else if (data.vamTestDistance) {
-    // VAM speed -> 10K pace estimate
-    const vamKmh = (data.vamTestDistance / 5) * 0.06; // e.g., 1000m -> 12km/h
-    const testPaceSecs = 3600 / vamKmh; // pace in sec/km
-    basePaceSecs = testPaceSecs / 0.85; // estimate 10k pace at 85% VAM
-    hasData = true;
-  }
+  // Riegel's formula: T2 = T1 * (D2/D1)^1.06
+  const predictTime = (targetDist: number): string => {
+    const secs = referenceSecs * Math.pow(targetDist / referenceDistance, 1.06);
+    return formatSecondsToTime(secs);
+  };
 
-  if (!hasData) {
-    // Default based on experience level
-    if (data.experienceLevel === ExperienceLevel.PRINCIPIANTE_ZERO) {
-      basePaceSecs = 420; // 7:00/km
-    } else if (data.experienceLevel === ExperienceLevel.INTERMEDIO_2K) {
-      basePaceSecs = 345; // 5:45/km
-    } else if (data.experienceLevel === ExperienceLevel.AVANZADO_5K) {
-      basePaceSecs = 300; // 5:00/km
-    }
-  }
+  return {
+    "5K": predictTime(5),
+    "10K": predictTime(10),
+    "21K": predictTime(21.1),
+    "42K": predictTime(42.2)
+  };
+}
+
+// ============================================================================
+// MÓDULO 10: CALCULATE TRAINING PACE ZONES
+// ============================================================================
+
+export function calculateTrainingZones(vamKmH: number): TrainingZones {
+  // Ritmo base equivalente a 10K: 85% de la velocidad VAM. El Test VAM es la única fuente de los
+  // ritmos de entrenamiento — nunca un tiempo de carrera autoreportado ni un valor por defecto genérico.
+  const basePaceSecs = vamKmH > 0 ? 3600 / (vamKmH * 0.85) : 330;
 
   // Apply formulas based on 10K base pace. Cada zona se muestra siempre rápido -> lento, tal y
   // como lo escribe el propio cerebro en su ejemplo ("Rodaje suave: 5:36 - 6:06/km").
@@ -512,23 +373,440 @@ const FUERZA_B_TEMPLATE = {
 };
 
 // ============================================================================
+// CONTENIDO DE CADA SESIÓN (extraído a función pura para poder reutilizarlo tanto al generar
+// el plan inicial como al recalcular las sesiones futuras tras repetir el Test VAM)
+// ============================================================================
+
+interface DaySessionContent {
+  type: "carrera" | "fuerza" | "descanso" | "movilidad";
+  name: string;
+  objective: string;
+  warmup: string;
+  mainWork: string;
+  intensity: string;
+  recovery: string;
+  cooldown: string;
+  physiologicalExplanation: string;
+  fatigueAdaptation: string;
+}
+
+function buildDaySessionContent(
+  w: number,
+  d: number,
+  data: OnboardingData,
+  zones: TrainingZones,
+  isDescarga: boolean,
+  isTaper: boolean,
+  durationWeeks: number
+): DaySessionContent {
+  // Let's decide what session to put on each day based on structures described in the manuals
+  let type: "carrera" | "fuerza" | "descanso" | "movilidad" = "descanso";
+  let name = "Descanso activo";
+  let objective = "Reposo para supercompensación y asimilación del entrenamiento.";
+  let warmup = "5-10 minutos de movilidad articular suave.";
+  let mainWork = "Descanso total o caminata ligera de 20-30 minutos.";
+  let intensity = "Baja. Sin impacto.";
+  let recovery = "N/A";
+  let cooldown = "Rutina de estiramientos ligeros.";
+  let physiologicalExplanation = "Las adaptaciones cardiovasculares y musculares ocurren durante el descanso, no durante la carrera. El cuerpo repara los microdesgarros musculares y llena los depósitos de glucógeno.";
+  let fatigueAdaptation = "Si te sientes con energía, puedes añadir 20 min de caminata o estiramientos de yoga suave.";
+
+  // Force Days Allocation (Common for almost all plans)
+  const forceDay1 = 0; // Lunes: Fuerza A
+  const forceDay2 = 3; // Jueves: Fuerza B
+
+  if (isTaper && d === forceDay2) {
+    // Last week Taper: lighter force or mobility instead of Fuerza B
+    type = "movilidad";
+    name = "Movilidad y Activación Pre-Carrera";
+    objective = "Mantener activas las fibras musculares sin generar fatiga ni agujetas.";
+    warmup = "10 minutos de movilidad general dinámica.";
+    mainWork = "Activación de glúteos (2x15 monster walk), core suave (2x30s plancha), estiramientos activos dinámicos de cadera y tobillo.";
+    intensity = "Muy baja. Cero fatiga.";
+    recovery = "N/A";
+    cooldown = "Caminata de 10 min + respiración.";
+    physiologicalExplanation = "Mantiene los rangos de movimiento y la conexión mente-músculo lista sin mermar tus reservas de glucógeno para la prueba final.";
+    fatigueAdaptation = "Si notas tensión, dedícale más tiempo a la movilidad de tobillos.";
+  } else if (d === forceDay1) {
+    type = "fuerza";
+    name = FUERZA_A_TEMPLATE.name;
+    objective = FUERZA_A_TEMPLATE.objective;
+    warmup = FUERZA_A_TEMPLATE.warmup;
+    mainWork = isDescarga ? FUERZA_A_TEMPLATE.mainWork.replace(/3x10/g, "2x8").replace(/3x12/g, "2x10").replace(/3x40s/g, "2x30s") : FUERZA_A_TEMPLATE.mainWork;
+    intensity = isDescarga ? "Carga reducida para regeneración (volumen -30%)." : FUERZA_A_TEMPLATE.intensity;
+    recovery = FUERZA_A_TEMPLATE.recovery;
+    cooldown = FUERZA_A_TEMPLATE.cooldown;
+    physiologicalExplanation = FUERZA_A_TEMPLATE.physiologicalExplanation;
+    fatigueAdaptation = FUERZA_A_TEMPLATE.fatigueAdaptation;
+  } else if (d === forceDay2) {
+    type = "fuerza";
+    name = FUERZA_B_TEMPLATE.name;
+    objective = FUERZA_B_TEMPLATE.objective;
+    warmup = FUERZA_B_TEMPLATE.warmup;
+    mainWork = isDescarga ? FUERZA_B_TEMPLATE.mainWork.replace(/3x10/g, "2x8").replace(/3x25s/g, "2x20s").replace(/3x30s/g, "2x20s") : FUERZA_B_TEMPLATE.mainWork;
+    intensity = isDescarga ? "Volumen de fuerza rebajado un 25% para recuperación." : FUERZA_B_TEMPLATE.intensity;
+    recovery = FUERZA_B_TEMPLATE.recovery;
+    cooldown = FUERZA_B_TEMPLATE.cooldown;
+    physiologicalExplanation = FUERZA_B_TEMPLATE.physiologicalExplanation;
+    fatigueAdaptation = FUERZA_B_TEMPLATE.fatigueAdaptation;
+  } else {
+    // Carrera Days Allocation
+    // Depending on Frecuencia Option
+    let isRunDay = false;
+
+    if (data.frequency === FrequencyOption.FREQ_2_2) {
+      // Tue (1) and Fri (4) or Sun (6)
+      if (d === 1 || d === 5) isRunDay = true;
+    } else if (data.frequency === FrequencyOption.FREQ_3_2) {
+      // Tue (1), Fri (4), Sun (6)
+      if (d === 1 || d === 4 || d === 6) isRunDay = true;
+    } else if (data.frequency === FrequencyOption.FREQ_4_2) {
+      // Tue (1), Wed (2), Fri (4), Sun (6)
+      if (d === 1 || d === 2 || d === 4 || d === 6) isRunDay = true;
+    } else {
+      // FREQ_5_2: Tue (1), Wed (2), Fri (4), Sat (5), Sun (6)
+      if (d === 1 || d === 2 || d === 4 || d === 5 || d === 6) isRunDay = true;
+    }
+
+    if (isRunDay) {
+      type = "carrera";
+
+      // Let's decide run session details based on the objective and day of run
+      if (data.objective === RunningObjective.PRIMER_10K) {
+        if (data.experienceLevel === ExperienceLevel.PRINCIPIANTE_ZERO) {
+          // Run/walk strategy. Focus on volume, low intensity
+          const walkRatio = Math.max(1, 3 - Math.floor(w / 3)); // Decreases as weeks progress
+          const runRatio = Math.min(10, w); // Increases
+          const reps = 6 + Math.floor(w / 2);
+
+          if (d === 6) {
+            // Tirada Larga
+            name = `Tirada Larga Run/Walk - S${w}`;
+            objective = "Incrementar progresivamente la duración en movimiento continuo de forma segura.";
+            warmup = "10 minutos de movilidad articular dinámica y caminata rápida.";
+            mainWork = isDescarga
+              ? `${reps - 2} series de [${runRatio} min corriendo fácil + ${walkRatio} min caminando].`
+              : `${reps} series de [${runRatio} min corriendo fácil + ${walkRatio} min caminando].`;
+            intensity = `Ritmo fácil / Regenerativo (Zonas RPE 2-3). Ritmo recomendado: ${zones.regenerative}`;
+            recovery = "Caminata activa integrada en la serie.";
+            cooldown = "5 minutos de caminata muy lenta de vuelta a la calma.";
+            physiologicalExplanation = "El método Ca-Co (Caminar-Correr) permite acumular volumen limitando el impacto músculo-esquelético, estimulando adaptaciones de tendones y capilares.";
+            fatigueAdaptation = "Si se siente muy duro, aumenta el tramo de caminata en 1 minuto.";
+          } else {
+            name = `Rodaje Suave Run/Walk - S${w}`;
+            objective = "Mejorar la base de resistencia aeróbica y adaptación neuromuscular.";
+            warmup = "10 minutos de movilidad y caminata rápida.";
+            mainWork = `${reps - 2} series de [${runRatio} min corriendo suave + ${walkRatio} min caminando].`;
+            intensity = `Fácil y sin ahogo: ${zones.suave} (RPE 3-4).`;
+            recovery = "Caminata activa.";
+            cooldown = "5 minutos de caminata + estiramientos.";
+            physiologicalExplanation = "Mantiene los niveles de lactato muy bajos en sangre y promueve el uso de grasas como fuente de energía principal.";
+            fatigueAdaptation = "Si las pulsaciones suben demasiado, reduce el ritmo de carrera y camina un poco más.";
+          }
+        } else {
+          // Primer 10k but has background (Intermedio/Avanzado)
+          if (d === 6) {
+            // Tirada larga
+            const baseKms = data.experienceLevel === ExperienceLevel.INTERMEDIO_2K ? 5 : 7;
+            const dist = isDescarga ? baseKms : baseKms + Math.min(5, Math.floor(w * 0.7));
+            name = `Tirada Larga Aeróbica - ${dist}K`;
+            objective = "Desarrollar la tolerancia del volumen y resistencia muscular de las piernas.";
+            warmup = "10 minutos de estiramientos dinámicos y zancadas lentas.";
+            mainWork = `Correr de forma continua durante ${dist} km a ritmo controlado.`;
+            intensity = `Ritmo suave: ${zones.suave} (RPE 3-4).`;
+            recovery = "N/A (Esfuerzo continuo).";
+            cooldown = "5 minutos de caminata lenta + foam roller en gemelos.";
+            physiologicalExplanation = "Incrementa la densidad de mitocondrias en las fibras musculares de tipo I (lentas) y optimiza el almacenamiento de glucógeno en el músculo.";
+            fatigueAdaptation = "Si te sientes fatigado, reduce el volumen a los kilómetros mínimos de la semana anterior.";
+          } else if (d === 1) {
+            // Calidad moderada o series (solo en semanas medias)
+            if (w > 2 && !isDescarga && !isTaper) {
+              const reps = w <= 5 ? 4 : 6;
+              name = `Intervalos de Adaptación - ${reps}x500m`;
+              objective = "Introducir velocidad controlada y mejorar el umbral de lactato de forma progresiva.";
+              warmup = "15 minutos de rodaje suave + 3 progresivos de 60 metros.";
+              mainWork = `${reps} series de 500 metros a ritmo rápido con recuperación estática.`;
+              intensity = `Ritmo de series largas: ${zones.seriesLargas} (RPE 7-8).`;
+              recovery = "Descansar 90 segundos parado o caminando lento.";
+              cooldown = "10 minutos de trote muy suave regenerativo.";
+              physiologicalExplanation = "Eleva el VO2 máximo de manera moderada y ayuda a reclutar fibras rápidas sin sobrecargar las articulaciones.";
+              fatigueAdaptation = "Si es tu primer contacto con series, haz solo 3 repeticiones de 400m.";
+            } else {
+              name = "Rodaje Fácil de Recuperación";
+              objective = "Facilitar la circulación sanguínea para reparar tejidos sin añadir estrés mecánico.";
+              warmup = "Movilidad articular general.";
+              mainWork = "Trote continuo y fluido de 25-35 minutos.";
+              intensity = `Tono muy fácil / regenerativo: ${zones.regenerative} (RPE 2-3).`;
+              recovery = "N/A";
+              cooldown = "Estiramientos generales.";
+              physiologicalExplanation = "El movimiento ligero aumenta el riego de nutrientes a los músculos fatigados por la sesión de fuerza anterior, acelerando el drenaje celular.";
+              fatigueAdaptation = "Si hay molestias articulares, camina a paso ligero durante 35 minutos.";
+            }
+          } else {
+            // Rodaje intermedio
+            const duration = 30 + Math.min(15, w * 2);
+            name = "Rodaje de Resistencia Aeróbica";
+            objective = "Construir volumen de carrera general semanal de forma equilibrada.";
+            warmup = "5 minutos de movilidad + caminata activa.";
+            mainWork = `Trote continuo y constante de ${duration} minutos.`;
+            intensity = `Ritmo suave o controlado: ${zones.suave} (RPE 4).`;
+            recovery = "N/A";
+            cooldown = "5 minutos de caminata rápida a lenta.";
+            physiologicalExplanation = "Fortalece las articulaciones del tobillo y la rodilla mediante el impacto repetitivo controlado.";
+            fatigueAdaptation = "Si no dispones de tiempo, puedes dividir la sesión en 2 bloques con 2 minutos de caminata.";
+          }
+        }
+      } else if (data.objective === RunningObjective.MEJORAR_10K) {
+        // Highly Structured 10K Plan
+        if (isTaper && w === durationWeeks && d === 6) {
+          // Final race test
+          name = "Test de Competencia Final: 10K!";
+          objective = "Buscar tu nueva marca personal en la distancia de 10 kilómetros.";
+          warmup = "15 minutos de trote progresivo + 4 rectas dinámicas de 50m + movilidad articular.";
+          mainWork = "10 kilómetros al máximo esfuerzo controlado (carrera oficial o test en ruta).";
+          intensity = `Ritmo objetivo: ${zones.paceActual} o superior. Buscar Ritmo de Tempo: ${zones.tempo}.`;
+          recovery = "Caminata y mucha hidratación al finalizar.";
+          cooldown = "10 minutos de trote extremadamente suave + estiramientos.";
+          physiologicalExplanation = "Culminación del programa donde pones a prueba la optimización cardiovascular y la eficiencia de carrera ganada.";
+          fatigueAdaptation = "Ajusta tu estrategia corriendo en negativo (primera mitad 5 segundos más lenta que la segunda).";
+        } else if (d === 1) {
+          // Martes: Series de calidad según la tabla del manual
+          let repsText = "6x400m";
+          let ritText = zones.seriesCortas;
+          let recText = "Descanso de 90 segundos parado.";
+
+          if (w === 1) { repsText = "6x400m"; ritText = zones.seriesCortas; }
+          else if (w === 2) { repsText = "8x400m"; ritText = zones.seriesCortas; }
+          else if (w === 3) { repsText = "5x800m"; ritText = zones.seriesLargas; recText = "Descanso de 2 minutos."; }
+          else if (w === 4) { repsText = "6x400m (Descarga)"; ritText = zones.seriesCortas; recText = "Descanso de 2 minutos."; }
+          else if (w === 5) { repsText = "6x800m"; ritText = zones.seriesLargas; recText = "Descanso de 2 minutos."; }
+          else if (w === 6) { repsText = "4x1000m"; ritText = zones.umbral; recText = "Descanso de 2 min trote suave."; }
+          else if (w === 7) { repsText = "3x1600m"; ritText = zones.umbral; recText = "Descanso de 2 min 30 s parado."; }
+          else if (w === 8) { repsText = "5x400m (Taper)"; ritText = zones.seriesCortas; recText = "Descanso de 2 min."; }
+          else { repsText = "4x1000m"; ritText = zones.umbral; }
+
+          name = `Series de Calidad: ${repsText}`;
+          objective = "Mejorar el volumen de oxígeno máximo (VO2 Max) y la tolerancia neuromuscular al ritmo rápido.";
+          warmup = "15 minutos de rodaje suave progresivo + técnica de carrera + 3 rectas.";
+          mainWork = `Realizar ${repsText} en pista o asfalto plano con recuperación estática.`;
+          intensity = `Ritmo: ${ritText}.`;
+          recovery = recText;
+          cooldown = "10 minutos de trote muy suave regenerativo.";
+          physiologicalExplanation = "Las series cortas incrementan la capacidad buffer del músculo ante la acidez del lactato. Las series largas optimizan la eficiencia aeróbica e incrementan el umbral anaeróbico.";
+          fatigueAdaptation = "Si el readiness diario es menor a 55, sustituye inmediatamente por rodaje suave.";
+        } else if (d === 4) {
+          // Viernes: Tempo / Umbral según el manual
+          let kms = 4;
+          if (w === 1) kms = 4;
+          else if (w === 2) kms = 5;
+          else if (w === 3) kms = 6;
+          else if (w === 4) kms = 4; // descarga
+          else if (w === 5) kms = 7;
+          else if (w === 6) kms = 7;
+          else if (w === 7) kms = 8;
+          else kms = 4; // taper
+
+          name = `Tempo de Ritmo de Umbral - ${kms}K`;
+          objective = "Desarrollar la capacidad de sostener un ritmo elevado de forma constante durante más tiempo.";
+          warmup = "10 minutos de trote suave + movilidad dinámica rápida.";
+          mainWork = `Carrera continua sin pausa durante ${kms} kilómetros a ritmo tempo estable.`;
+          intensity = `Ritmo de Tempo: ${zones.tempo} (RPE 7-8).`;
+          recovery = "N/A (Esfuerzo continuo).";
+          cooldown = "5 minutos de trote suave de vuelta a la calma + estiramientos.";
+          physiologicalExplanation = "Entrena el cuerpo para reciclar el lactato y usarlo como combustible, retrasando la aparición de la fatiga a ritmos exigentes.";
+          fatigueAdaptation = "Si vas forzado, puedes dividirlo en 2 bloques con 1 minuto de caminata en medio.";
+        } else if (d === 6) {
+          // Domingo: Tirada larga según el manual
+          let kms = 10;
+          if (w === 1) kms = 10;
+          else if (w === 2) kms = 11;
+          else if (w === 3) kms = 12;
+          else if (w === 4) kms = 9; // descarga
+          else if (w === 5) kms = 12;
+          else if (w === 6) kms = 13;
+          else if (w === 7) kms = 10;
+          else kms = 6; // taper
+
+          name = `Tirada Larga de Resistencia - ${kms}K`;
+          objective = "Mejorar la base de fondo, resiliencia estructural de tendones y articulaciones.";
+          warmup = "10 minutos de trote suave + movilidad activa general.";
+          mainWork = `Carrera continua de fondo cubriendo ${kms} kilómetros.`;
+          intensity = `Ritmo suave: ${zones.suave} (RPE 3-4).`;
+          recovery = "N/A";
+          cooldown = "5 minutos de trote regenerativo + estiramientos dinámicos.";
+          physiologicalExplanation = "Incrementa la capilarización y el número de vasos sanguíneos que llegan a los músculos, mejorando el aporte de oxígeno.";
+          fatigueAdaptation = "Si tus articulaciones sufren, realiza la tirada larga un 5% más lento.";
+        } else {
+          // Miércoles u otro día: Rodaje suave para recuperar carga
+          name = "Rodaje de Base e Hidratación";
+          objective = "Recuperar activamente entre sesiones de calidad, acumulando kilómetros base.";
+          warmup = "5 minutos de movilidad articular de cadera.";
+          mainWork = "Trote suave continuo y cómodo de 30 a 45 minutos.";
+          intensity = `Ritmo regenerativo: ${zones.regenerative} (RPE 2-3).`;
+          recovery = "N/A";
+          cooldown = "Estiramientos suaves de pantorrillas y cuádriceps.";
+          physiologicalExplanation = "Estimula la eliminación de toxinas musculares mediante un riego sanguíneo constante a baja intensidad.";
+          fatigueAdaptation = "Si estás exhausto, camina 40 minutos rápido en lugar de correr.";
+        }
+      } else if (data.objective === RunningObjective.PRIMER_21K || data.objective === RunningObjective.MEJORAR_21K) {
+        // Media Maratón
+        if (isTaper && w === durationWeeks && d === 6) {
+          name = "¡Día de Media Maratón (21.1K)!";
+          objective = "Completar la carrera de fondo y cumplir tu meta con sensaciones óptimas.";
+          warmup = "10 minutos de movilidad general, caminata rápida y un leve trote de activación.";
+          mainWork = "Corre los 21.1 kilómetros dosificados de inicio a fin.";
+          intensity = `Ritmo objetivo: ${zones.tempo} (para mejorar) o RPE 5-6 controlado.`;
+          recovery = "Cuidado con la hidratación inicial con sales e ingesta de carbohidratos.";
+          cooldown = "Paseo suave y felicitaciones.";
+          physiologicalExplanation = "Demostración de la mejora de eficiencia energética de grasas y carbohidratos construida durante el plan.";
+          fatigueAdaptation = "Sal conservador en los primeros 5 km. La carrera de 21K se decide después del kilómetro 15.";
+        } else if (d === 6) {
+          // Tirada Larga de 21K
+          const baseTL = 12;
+          const kms = isDescarga ? Math.floor(baseTL * 0.8) : baseTL + Math.min(6, w);
+          name = `Tirada Larga Progresiva - ${kms}K`;
+          objective = "Consolidar la resistencia de fondo y probar la nutrición de geles/hidratación.";
+          warmup = "10 minutos de trote muy suave + movilidad de cadera.";
+          mainWork = `Carrera continua de ${kms} km. Si te sientes bien, corre los últimos 2 km a ritmo objetivo de carrera.`;
+          intensity = `Ritmo suave: ${zones.suave}. Paso por km: ${zones.suave}`;
+          recovery = "N/A";
+          cooldown = "10 minutos de estiramientos dinámicos y ducha fría en piernas.";
+          physiologicalExplanation = "Estrecha la conexión de tus fibras musculares, entrena el sistema gastrointestinal para absorber agua y carbohidratos en carrera.";
+          fatigueAdaptation = "Si notas molestias articulares, haz los últimos 2 kilómetros caminando.";
+        } else if (d === 1) {
+          // Series largas o cuestas
+          const reps = 3 + Math.floor(w / 3);
+          name = `Series de Resistencia Aeróbica - ${reps}x1000m`;
+          objective = "Desarrollar la potencia aeróbica máxima y el umbral de lactato.";
+          warmup = "15 minutos de trote progresivo + técnica de carrera.";
+          mainWork = `Realizar ${reps} series de 1000m recuperando parado.`;
+          intensity = `Ritmo de series largas: ${zones.seriesLargas}.`;
+          recovery = "Descanso de 2 minutos parado.";
+          cooldown = "10 minutos de trote muy fácil.";
+          physiologicalExplanation = "Aumenta la fuerza de contracción cardíaca, expandiendo el volumen sistólico del ventrículo izquierdo.";
+          fatigueAdaptation = "Si te sientes muy fatigado, haz tramos más cortos de 800m.";
+        } else {
+          name = "Tempo Controlado de Media Maratón";
+          objective = "Fijar el ritmo específico de carrera de fondo.";
+          warmup = "10 minutos de trote suave.";
+          mainWork = `Trote de ${25 + w * 2} minutos con bloques centrales a ritmo objetivo de media maratón.`;
+          intensity = `Ritmo controlado: ${zones.controlado} (RPE 5-6).`;
+          recovery = "N/A";
+          cooldown = "5 minutos de estiramientos.";
+          physiologicalExplanation = "Enseña al cuerpo a acumular fatiga sin desestabilizar la técnica de zancada eficiente.";
+          fatigueAdaptation = "Si las pulsaciones están disparadas, mantente solo en ritmo suave.";
+        }
+      } else if (data.objective === RunningObjective.MEJORAR_RITMO) {
+        // Speed improvement
+        if (d === 1) {
+          // Cortas
+          name = `Series Cortas de Velocidad - 8x200m`;
+          objective = "Mejorar la velocidad punta, el reclutamiento de fibras rápidas y la eficiencia biomecánica.";
+          warmup = "15 minutos de trote suave + técnica activa + 4 rectas acelerando.";
+          mainWork = "8 series de 200 metros en asfalto llano a intensidad máxima controlada.";
+          intensity = `Ritmo de series cortas: ${zones.seriesCortas} (RPE 9).`;
+          recovery = "Descanso de 2 minutos caminando lento.";
+          cooldown = "10 minutos de trote lento.";
+          physiologicalExplanation = "Aumenta el reclutamiento muscular rápido e incrementa la rigidez del tendón de Aquiles, mejorando el retorno de energía de cada pisada.";
+          fatigueAdaptation = "Si notas algún tirón en los isquios o gemelos, aborta y camina.";
+        } else if (d === 4) {
+          // Tempo Intenso
+          name = "Tempo Intenso de Umbral de Lactato";
+          objective = "Subir el umbral láctico y tolerar esfuerzos de ritmo alto continuo.";
+          warmup = "10 minutos de trote progresivo.";
+          mainWork = `Corre continuamente por 20 minutos a ritmo de Tempo fuerte.`;
+          intensity = `Ritmo de Tempo: ${zones.tempo} (RPE 8).`;
+          recovery = "N/A";
+          cooldown = "10 minutos de vuelta a la calma muy suave.";
+          physiologicalExplanation = "Al entrenar justo debajo del umbral de lactato, enseñas a tus células a asimilar la acidosis muscular de forma más eficiente.";
+          fatigueAdaptation = "Si no puedes sostenerlo, haz bloques de 5 minutos con 1 minuto de trote muy fácil.";
+        } else {
+          name = "Rodaje Fácil Regenerativo";
+          objective = "Recuperar el sistema neuromuscular tras la sesión de velocidad.";
+          warmup = "5 minutos de movilidad general.";
+          mainWork = "Trote suave de 30-40 minutos sin mirar el reloj.";
+          intensity = `Ritmo muy suave / regenerativo: ${zones.regenerative} (RPE 3).`;
+          recovery = "N/A";
+          cooldown = "Movilidad articular general de cadera.";
+          physiologicalExplanation = "La baja intensidad estimula la hormona de crecimiento y el flujo sanguíneo reparador, limpiando metabolitos residuales.";
+          fatigueAdaptation = "Si estás cansado mentalmente, realiza una sesión alternativa de ciclismo suave o elíptica.";
+        }
+      } else {
+        // MEJORAR_RESISTENCIA
+        if (d === 6) {
+          // Tirada larga es clave
+          const baseEndurance = 8;
+          const kms = isDescarga ? Math.floor(baseEndurance * 0.8) : baseEndurance + Math.floor(w * 1.05); // increases 5% approx
+          name = `Tirada Larga Aeróbica - ${kms}K`;
+          objective = "Aumentar el límite de resistencia y acondicionamiento estructural.";
+          warmup = "10 minutos de movilidad articular de tobillos y rodillas.";
+          mainWork = `Carrera continua y cómoda cubriendo ${kms} kilómetros de forma regular.`;
+          intensity = `Ritmo suave / fácil: ${zones.suave} (RPE 3-4).`;
+          recovery = "N/A";
+          cooldown = "Caminata de 5 min + hidratación completa.";
+          physiologicalExplanation = "Promueve la biogénesis mitocondrial y aumenta la capilarización en las piernas, dándole más gasolina a tus músculos de fondo.";
+          fatigueAdaptation = "Si tus piernas pesan demasiado, camina durante 1 minuto por cada 5 kilómetros.";
+        } else if (d === 1) {
+          name = "Tempo Moderado por Intervalos";
+          objective = "Desarrollar la fuerza aeróbica y resistencia cardiovascular.";
+          warmup = "10 minutos de trote muy fácil.";
+          mainWork = `Realizar 3 bloques de 8 minutos a ritmo controlado con 2 minutos de caminata entre bloques.`;
+          intensity = `Ritmo controlado: ${zones.controlado} (RPE 5-6).`;
+          recovery = "2 minutos de caminata lenta entre intervalos.";
+          cooldown = "5 minutos de trote suave.";
+          physiologicalExplanation = "Divide el esfuerzo para mantener una intensidad de umbral adecuada sin fatiga extrema del sistema nervioso central.";
+          fatigueAdaptation = "Si te sientes cansado, acorta los bloques a 6 minutos.";
+        } else {
+          name = "Rodaje Suave de Base Aeróbica";
+          objective = "Incrementar de forma segura el kilometraje semanal de base.";
+          warmup = "5 minutos de movilidad activa.";
+          mainWork = `Trote continuo y fluido de 40 minutos.`;
+          intensity = `Ritmo suave: ${zones.suave} (RPE 3-4).`;
+          recovery = "N/A";
+          cooldown = "Toma de pulsaciones y estiramientos suaves.";
+          physiologicalExplanation = "Estimula la adaptación de los huesos y tendones para tolerar las fuerzas de impacto repetidas del running.";
+          fatigueAdaptation = "Si hay molestias o dolor leve, detén el trote y camina.";
+        }
+      }
+    }
+  }
+
+  return { type, name, objective, warmup, mainWork, intensity, recovery, cooldown, physiologicalExplanation, fatigueAdaptation };
+}
+
+// Cada 4 semanas (semana de descarga) la última sesión de carrera se convierte en el día obligatorio
+// de repetición del Test VAM (Módulo 10 del RUNNING_AI_DECISION_ENGINE), en vez de rodaje normal.
+function applyVamRetestOverride(sessions: WorkoutSession[], isDescarga: boolean): void {
+  if (!isDescarga) return;
+  for (let i = sessions.length - 1; i >= 0; i--) {
+    if (sessions[i].type === "carrera") {
+      sessions[i] = {
+        ...sessions[i],
+        isVamRetest: true,
+        name: "Test VAM: Repetición Obligatoria",
+        objective: "Medir tu Velocidad Aeróbica Máxima actual para recalcular tus ritmos de entrenamiento con datos frescos, no desactualizados.",
+        warmup: "15 minutos de trote muy suave + movilidad articular + 2-3 progresivos cortos.",
+        mainWork: `Corre al máximo esfuerzo que puedas sostener durante ${RUNNING_VAM_TEST_DURATION_MIN} minutos (pista, cinta o exterior llano) y registra la distancia total recorrida en la app.`,
+        intensity: "Esfuerzo máximo sostenible de principio a fin. RPE 9-10 al finalizar.",
+        recovery: "Caminata y trote muy suave 10 minutos tras el test.",
+        cooldown: "Estiramientos suaves generales.",
+        physiologicalExplanation: "Repetir el Test VAM cada 4 semanas permite recalcular tus zonas de ritmo con datos reales y actualizados, en vez de seguir entrenando con un tiempo que puede haber quedado desfasado.",
+        fatigueAdaptation: "Si hoy no estás en condiciones de dar el máximo (fatiga alta, dolor, mala noche), pospón el test 1-2 días en vez de forzarlo: un test hecho sin frescura da un VAM artificialmente bajo."
+      };
+      return;
+    }
+  }
+}
+
+// ============================================================================
 // CEREBRO MAESTRO RUNNING DEFINITIVO (MASTER_BRAIN)
 // ============================================================================
 
-export function generateTrainingPlan(data: OnboardingData): TrainingPlan {
-  // Para los objetivos que dependen del Test VAM, las sesiones diarias necesitan igualmente un ritmo
-  // de referencia desde el día 1 (aunque sea genérico): se ignora cualquier tiempo de 10K/21K/VAM
-  // introducido en el onboarding y se cae al fallback por nivel/genérico de calculateTrainingZones.
-  // El Dashboard, en cambio, no mostrará estas zonas como "calculadas" hasta completar el Test VAM
-  // real (ver App.tsx -> handleSaveVAMTest, que sí recalcula plan.zones con el dato real).
-  const zones = calculateTrainingZones(
-    NEEDS_VAM_OBJECTIVES.has(data.objective)
-      ? { ...data, time10K: undefined, time21K: undefined, vamTestDistance: undefined }
-      : data
-  );
+export function generateTrainingPlan(data: OnboardingData, vamKmH: number): TrainingPlan {
+  const zones = calculateTrainingZones(vamKmH);
   const limitants = detectLimitant(data);
   const successProb = estimateSuccessProbability(data);
-  const estimatedPaces = predictMarks(data);
+  const estimatedPaces = predictMarks(vamKmH);
   const bmiCalc = calculateBMI(data.weight, data.height);
 
   let durationWeeks = 8;
@@ -548,11 +826,17 @@ export function generateTrainingPlan(data: OnboardingData): TrainingPlan {
     }
   } else if (data.objective === RunningObjective.MEJORAR_10K) {
     durationWeeks = data.frequency === FrequencyOption.FREQ_3_2 ? 8 : 10;
-    levelEstimated = classifyLevelFrom10KPace(data.time10K);
+    const paceSec = parseTimeToSeconds(data.time10K || "55:00") / 10;
+    if (paceSec > 360) levelEstimated = "Principiante";
+    else if (paceSec >= 270) levelEstimated = "Intermedio";
+    else levelEstimated = "Avanzado";
   } else if (data.objective === RunningObjective.PRIMER_21K) {
     durationWeeks = 12; // default
     // El cerebro exige usar el tiempo de 10K para estimar el nivel actual (no un valor fijo).
-    levelEstimated = classifyLevelFrom10KPace(data.time10K);
+    const paceSec = parseTimeToSeconds(data.time10K || "55:00") / 10;
+    if (paceSec > 360) levelEstimated = "Principiante";
+    else if (paceSec >= 270) levelEstimated = "Intermedio";
+    else levelEstimated = "Avanzado";
   } else if (data.objective === RunningObjective.MEJORAR_21K) {
     durationWeeks = 12; // default
     const paceSec = parseTimeToSeconds(data.time21K || "02:00:00") / 21.1;
@@ -561,8 +845,7 @@ export function generateTrainingPlan(data: OnboardingData): TrainingPlan {
     else levelEstimated = "Avanzado";
   } else if (data.objective === RunningObjective.MEJORAR_RITMO) {
     durationWeeks = 8;
-    // El cerebro exige usar el tiempo de 10K para estimar el nivel actual (no un valor fijo).
-    levelEstimated = classifyLevelFrom10KPace(data.time10K);
+    levelEstimated = "Intermedio";
   } else if (data.objective === RunningObjective.MEJORAR_RESISTENCIA) {
     durationWeeks = 10;
     if (data.maxDistanceCurrent === "less_5") levelEstimated = "Principiante";
@@ -570,12 +853,43 @@ export function generateTrainingPlan(data: OnboardingData): TrainingPlan {
     else levelEstimated = "Avanzado";
   }
 
-  // Objetivos de carrera: para Mi Primer 10K/21K, Mejorar 10K/21K y Mejorar Ritmo, los objetivos
-  // numéricos concretos solo se pueden calcular una vez completado el Test VAM real (ver App.tsx ->
-  // handleSaveVAMTest), nunca a partir de un tiempo introducido en el onboarding que puede ser
-  // antiguo. Solo Mejorar Resistencia conserva un objetivo descriptivo genérico, sin marca de tiempo.
+  // Set target paces based on objective. Los objetivos de marca (Mejorar 10K/21K) siguen usando el
+  // tiempo real de competición del usuario, no el VAM: aquí se trata de batir su propio récord, no de
+  // calibrar el ritmo de entrenamiento diario (para eso, el VAM es la única fuente).
   let targets = { conservador: "", realista: "", agresivo: "" };
-  if (!NEEDS_VAM_OBJECTIVES.has(data.objective)) {
+  if (data.objective === RunningObjective.PRIMER_10K) {
+    targets.conservador = "Completar la distancia corriendo de forma continua.";
+    targets.realista = "Completar los 10K sintiendo control y con RPE <6.";
+    targets.agresivo = "Acercarse a un tiempo sub-60 minutos.";
+  } else if (data.objective === RunningObjective.MEJORAR_10K && data.time10K) {
+    // Mejora realista 10K, plan de 8 semanas (cerebro): valores fijos, no un rango calculado.
+    const totalSecs = parseTimeToSeconds(data.time10K);
+    const pct10K =
+      levelEstimated === "Principiante"
+        ? { conservador: 0.04, realista: 0.05, agresivo: 0.07 }
+        : levelEstimated === "Intermedio"
+        ? { conservador: 0.03, realista: 0.035, agresivo: 0.04 }
+        : { conservador: 0.01, realista: 0.015, agresivo: 0.03 };
+    targets.conservador = formatSecondsToTime(totalSecs * (1 - pct10K.conservador));
+    targets.realista = formatSecondsToTime(totalSecs * (1 - pct10K.realista));
+    targets.agresivo = formatSecondsToTime(totalSecs * (1 - pct10K.agresivo));
+  } else if (data.objective === RunningObjective.PRIMER_21K) {
+    targets.conservador = "Cruzar la meta corriendo y sin lesiones.";
+    targets.realista = "Correr cómodamente, con tiempo estimado de: " + (estimatedPaces["21K"] || "2:05:00");
+    targets.agresivo = "Lograr una marca por debajo de 2 horas.";
+  } else if (data.objective === RunningObjective.MEJORAR_21K && data.time21K) {
+    // Mejora realista 21K, plan de 12 semanas (cerebro): valores fijos, no un rango calculado.
+    const totalSecs = parseTimeToSeconds(data.time21K);
+    const pct21K =
+      levelEstimated === "Principiante"
+        ? { conservador: 0.04, realista: 0.05, agresivo: 0.07 }
+        : levelEstimated === "Intermedio"
+        ? { conservador: 0.03, realista: 0.04, agresivo: 0.05 }
+        : { conservador: 0.015, realista: 0.02, agresivo: 0.03 };
+    targets.conservador = formatSecondsToTime(totalSecs * (1 - pct21K.conservador));
+    targets.realista = formatSecondsToTime(totalSecs * (1 - pct21K.realista));
+    targets.agresivo = formatSecondsToTime(totalSecs * (1 - pct21K.agresivo));
+  } else {
     targets.conservador = "Mejorar la tolerancia a la velocidad aeróbica.";
     targets.realista = "Reducir el ritmo de carrera de fondo en 15-20 seg/km.";
     targets.agresivo = "Mejorar un 5% el ritmo promedio del test de 5K.";
@@ -605,7 +919,7 @@ export function generateTrainingPlan(data: OnboardingData): TrainingPlan {
     }
 
     const sessions: WorkoutSession[] = [];
-    const runSessionsCount = 
+    const runSessionsCount =
       data.frequency === FrequencyOption.FREQ_2_2 ? 2 :
       data.frequency === FrequencyOption.FREQ_3_2 ? 3 :
       data.frequency === FrequencyOption.FREQ_4_2 ? 4 : 5;
@@ -613,405 +927,28 @@ export function generateTrainingPlan(data: OnboardingData): TrainingPlan {
     // Generate days of the week 0 (Lunes) to 6 (Domingo)
     for (let d = 0; d < 7; d++) {
       const sessionId = `w${w}-d${d}`;
-      
-      // Let's decide what session to put on each day based on structures described in the manuals
-      let type: "carrera" | "fuerza" | "descanso" | "movilidad" = "descanso";
-      let name = "Descanso activo";
-      let objective = "Reposo para supercompensación y asimilación del entrenamiento.";
-      let warmup = "5-10 minutos de movilidad articular suave.";
-      let mainWork = "Descanso total o caminata ligera de 20-30 minutos.";
-      let intensity = "Baja. Sin impacto.";
-      let recovery = "N/A";
-      let cooldown = "Rutina de estiramientos ligeros.";
-      let physiologicalExplanation = "Las adaptaciones cardiovasculares y musculares ocurren durante el descanso, no durante la carrera. El cuerpo repara los microdesgarros musculares y llena los depósitos de glucógeno.";
-      let fatigueAdaptation = "Si te sientes con energía, puedes añadir 20 min de caminata o estiramientos de yoga suave.";
-
-      // Force Days Allocation (Common for almost all plans)
-      const forceDay1 = 0; // Lunes: Fuerza A
-      const forceDay2 = 3; // Jueves: Fuerza B
-
-      if (isTaper && d === forceDay2) {
-        // Last week Taper: lighter force or mobility instead of Fuerza B
-        type = "movilidad";
-        name = "Movilidad y Activación Pre-Carrera";
-        objective = "Mantener activas las fibras musculares sin generar fatiga ni agujetas.";
-        warmup = "10 minutos de movilidad general dinámica.";
-        mainWork = "Activación de glúteos (2x15 monster walk), core suave (2x30s plancha), estiramientos activos dinámicos de cadera y tobillo.";
-        intensity = "Muy baja. Cero fatiga.";
-        recovery = "N/A";
-        cooldown = "Caminata de 10 min + respiración.";
-        physiologicalExplanation = "Mantiene los rangos de movimiento y la conexión mente-músculo lista sin mermar tus reservas de glucógeno para la prueba final.";
-        fatigueAdaptation = "Si notas tensión, dedícale más tiempo a la movilidad de tobillos.";
-      } else if (d === forceDay1) {
-        type = "fuerza";
-        name = FUERZA_A_TEMPLATE.name;
-        objective = FUERZA_A_TEMPLATE.objective;
-        warmup = FUERZA_A_TEMPLATE.warmup;
-        mainWork = isDescarga ? FUERZA_A_TEMPLATE.mainWork.replace(/3x10/g, "2x8").replace(/3x12/g, "2x10").replace(/3x40s/g, "2x30s") : FUERZA_A_TEMPLATE.mainWork;
-        intensity = isDescarga ? "Carga reducida para regeneración (volumen -30%)." : FUERZA_A_TEMPLATE.intensity;
-        recovery = FUERZA_A_TEMPLATE.recovery;
-        cooldown = FUERZA_A_TEMPLATE.cooldown;
-        physiologicalExplanation = FUERZA_A_TEMPLATE.physiologicalExplanation;
-        fatigueAdaptation = FUERZA_A_TEMPLATE.fatigueAdaptation;
-      } else if (d === forceDay2) {
-        type = "fuerza";
-        name = FUERZA_B_TEMPLATE.name;
-        objective = FUERZA_B_TEMPLATE.objective;
-        warmup = FUERZA_B_TEMPLATE.warmup;
-        mainWork = isDescarga ? FUERZA_B_TEMPLATE.mainWork.replace(/3x10/g, "2x8").replace(/3x25s/g, "2x20s").replace(/3x30s/g, "2x20s") : FUERZA_B_TEMPLATE.mainWork;
-        intensity = isDescarga ? "Volumen de fuerza rebajado un 25% para recuperación." : FUERZA_B_TEMPLATE.intensity;
-        recovery = FUERZA_B_TEMPLATE.recovery;
-        cooldown = FUERZA_B_TEMPLATE.cooldown;
-        physiologicalExplanation = FUERZA_B_TEMPLATE.physiologicalExplanation;
-        fatigueAdaptation = FUERZA_B_TEMPLATE.fatigueAdaptation;
-      } else {
-        // Carrera Days Allocation
-        // Depending on Frecuencia Option
-        let isRunDay = false;
-        
-        if (data.frequency === FrequencyOption.FREQ_2_2) {
-          // Tue (1) and Fri (4) or Sun (6)
-          if (d === 1 || d === 5) isRunDay = true;
-        } else if (data.frequency === FrequencyOption.FREQ_3_2) {
-          // Tue (1), Fri (4), Sun (6)
-          if (d === 1 || d === 4 || d === 6) isRunDay = true;
-        } else if (data.frequency === FrequencyOption.FREQ_4_2) {
-          // Tue (1), Wed (2), Fri (4), Sun (6)
-          if (d === 1 || d === 2 || d === 4 || d === 6) isRunDay = true;
-        } else {
-          // FREQ_5_2: Tue (1), Wed (2), Fri (4), Sat (5), Sun (6)
-          if (d === 1 || d === 2 || d === 4 || d === 5 || d === 6) isRunDay = true;
-        }
-
-        if (isRunDay) {
-          type = "carrera";
-          
-          // Let's decide run session details based on the objective and day of run
-          if (data.objective === RunningObjective.PRIMER_10K) {
-            if (data.experienceLevel === ExperienceLevel.PRINCIPIANTE_ZERO) {
-              // Run/walk strategy. Focus on volume, low intensity
-              const walkRatio = Math.max(1, 3 - Math.floor(w / 3)); // Decreases as weeks progress
-              const runRatio = Math.min(10, w); // Increases
-              const reps = 6 + Math.floor(w / 2);
-              
-              if (d === 6) {
-                // Tirada Larga
-                name = `Tirada Larga Run/Walk - S${w}`;
-                objective = "Incrementar progresivamente la duración en movimiento continuo de forma segura.";
-                warmup = "10 minutos de movilidad articular dinámica y caminata rápida.";
-                mainWork = isDescarga 
-                  ? `${reps - 2} series de [${runRatio} min corriendo fácil + ${walkRatio} min caminando].`
-                  : `${reps} series de [${runRatio} min corriendo fácil + ${walkRatio} min caminando].`;
-                intensity = `Ritmo fácil / Regenerativo (Zonas RPE 2-3). Ritmo recomendado: ${zones.regenerative}`;
-                recovery = "Caminata activa integrada en la serie.";
-                cooldown = "5 minutos de caminata muy lenta de vuelta a la calma.";
-                physiologicalExplanation = "El método Ca-Co (Caminar-Correr) permite acumular volumen limitando el impacto músculo-esquelético, estimulando adaptaciones de tendones y capilares.";
-                fatigueAdaptation = "Si se siente muy duro, aumenta el tramo de caminata en 1 minuto.";
-              } else {
-                name = `Rodaje Suave Run/Walk - S${w}`;
-                objective = "Mejorar la base de resistencia aeróbica y adaptación neuromuscular.";
-                warmup = "10 minutos de movilidad y caminata rápida.";
-                mainWork = `${reps - 2} series de [${runRatio} min corriendo suave + ${walkRatio} min caminando].`;
-                intensity = `Fácil y sin ahogo: ${zones.suave} (RPE 3-4).`;
-                recovery = "Caminata activa.";
-                cooldown = "5 minutos de caminata + estiramientos.";
-                physiologicalExplanation = "Mantiene los niveles de lactato muy bajos en sangre y promueve el uso de grasas como fuente de energía principal.";
-                fatigueAdaptation = "Si las pulsaciones suben demasiado, reduce el ritmo de carrera y camina un poco más.";
-              }
-            } else {
-              // Primer 10k but has background (Intermedio/Avanzado)
-              if (d === 6) {
-                // Tirada larga
-                const baseKms = data.experienceLevel === ExperienceLevel.INTERMEDIO_2K ? 5 : 7;
-                const dist = isDescarga ? baseKms : baseKms + Math.min(5, Math.floor(w * 0.7));
-                name = `Tirada Larga Aeróbica - ${dist}K`;
-                objective = "Desarrollar la tolerancia del volumen y resistencia muscular de las piernas.";
-                warmup = "10 minutos de estiramientos dinámicos y zancadas lentas.";
-                mainWork = `Correr de forma continua durante ${dist} km a ritmo controlado.`;
-                intensity = `Ritmo suave: ${zones.suave} (RPE 3-4).`;
-                recovery = "N/A (Esfuerzo continuo).";
-                cooldown = "5 minutos de caminata lenta + foam roller en gemelos.";
-                physiologicalExplanation = "Incrementa la densidad de mitocondrias en las fibras musculares de tipo I (lentas) y optimiza el almacenamiento de glucógeno en el músculo.";
-                fatigueAdaptation = "Si te sientes fatigado, reduce el volumen a los kilómetros mínimos de la semana anterior.";
-              } else if (d === 1) {
-                // Calidad moderada o series (solo en semanas medias)
-                if (w > 2 && !isDescarga && !isTaper) {
-                  const reps = w <= 5 ? 4 : 6;
-                  name = `Intervalos de Adaptación - ${reps}x500m`;
-                  objective = "Introducir velocidad controlada y mejorar el umbral de lactato de forma progresiva.";
-                  warmup = "15 minutos de rodaje suave + 3 progresivos de 60 metros.";
-                  mainWork = `${reps} series de 500 metros a ritmo rápido con recuperación estática.`;
-                  intensity = `Ritmo de series largas: ${zones.seriesLargas} (RPE 7-8).`;
-                  recovery = "Descansar 90 segundos parado o caminando lento.";
-                  cooldown = "10 minutos de trote muy suave regenerativo.";
-                  physiologicalExplanation = "Eleva el VO2 máximo de manera moderada y ayuda a reclutar fibras rápidas sin sobrecargar las articulaciones.";
-                  fatigueAdaptation = "Si es tu primer contacto con series, haz solo 3 repeticiones de 400m.";
-                } else {
-                  name = "Rodaje Fácil de Recuperación";
-                  objective = "Facilitar la circulación sanguínea para reparar tejidos sin añadir estrés mecánico.";
-                  warmup = "Movilidad articular general.";
-                  mainWork = "Trote continuo y fluido de 25-35 minutos.";
-                  intensity = `Tono muy fácil / regenerativo: ${zones.regenerative} (RPE 2-3).`;
-                  recovery = "N/A";
-                  cooldown = "Estiramientos generales.";
-                  physiologicalExplanation = "El movimiento ligero aumenta el riego de nutrientes a los músculos fatigados por la sesión de fuerza anterior, acelerando el drenaje celular.";
-                  fatigueAdaptation = "Si hay molestias articulares, camina a paso ligero durante 35 minutos.";
-                }
-              } else {
-                // Rodaje intermedio
-                const duration = 30 + Math.min(15, w * 2);
-                name = "Rodaje de Resistencia Aeróbica";
-                objective = "Construir volumen de carrera general semanal de forma equilibrada.";
-                warmup = "5 minutos de movilidad + caminata activa.";
-                mainWork = `Trote continuo y constante de ${duration} minutos.`;
-                intensity = `Ritmo suave o controlado: ${zones.suave} (RPE 4).`;
-                recovery = "N/A";
-                cooldown = "5 minutos de caminata rápida a lenta.";
-                physiologicalExplanation = "Fortalece las articulaciones del tobillo y la rodilla mediante el impacto repetitivo controlado.";
-                fatigueAdaptation = "Si no dispones de tiempo, puedes dividir la sesión en 2 bloques con 2 minutos de caminata.";
-              }
-            }
-          } else if (data.objective === RunningObjective.MEJORAR_10K) {
-            // Highly Structured 10K Plan
-            if (isTaper && w === durationWeeks && d === 6) {
-              // Final race test
-              name = "Test de Competencia Final: 10K!";
-              objective = "Buscar tu nueva marca personal en la distancia de 10 kilómetros.";
-              warmup = "15 minutos de trote progresivo + 4 rectas dinámicas de 50m + movilidad articular.";
-              mainWork = "10 kilómetros al máximo esfuerzo controlado (carrera oficial o test en ruta).";
-              intensity = `Ritmo objetivo: ${zones.paceActual} o superior. Buscar Ritmo de Tempo: ${zones.tempo}.`;
-              recovery = "Caminata y mucha hidratación al finalizar.";
-              cooldown = "10 minutos de trote extremadamente suave + estiramientos.";
-              physiologicalExplanation = "Culminación del programa donde pones a prueba la optimización cardiovascular y la eficiencia de carrera ganada.";
-              fatigueAdaptation = "Ajusta tu estrategia corriendo en negativo (primera mitad 5 segundos más lenta que la segunda).";
-            } else if (d === 1) {
-              // Martes: Series de calidad según la tabla del manual
-              let repsText = "6x400m";
-              let ritText = zones.seriesCortas;
-              let recText = "Descanso de 90 segundos parado.";
-              
-              if (w === 1) { repsText = "6x400m"; ritText = zones.seriesCortas; }
-              else if (w === 2) { repsText = "8x400m"; ritText = zones.seriesCortas; }
-              else if (w === 3) { repsText = "5x800m"; ritText = zones.seriesLargas; recText = "Descanso de 2 minutos."; }
-              else if (w === 4) { repsText = "6x400m (Descarga)"; ritText = zones.seriesCortas; recText = "Descanso de 2 minutos."; }
-              else if (w === 5) { repsText = "6x800m"; ritText = zones.seriesLargas; recText = "Descanso de 2 minutos."; }
-              else if (w === 6) { repsText = "4x1000m"; ritText = zones.umbral; recText = "Descanso de 2 min trote suave."; }
-              else if (w === 7) { repsText = "3x1600m"; ritText = zones.umbral; recText = "Descanso de 2 min 30 s parado."; }
-              else if (w === 8) { repsText = "5x400m (Taper)"; ritText = zones.seriesCortas; recText = "Descanso de 2 min."; }
-              else { repsText = "4x1000m"; ritText = zones.umbral; }
-
-              name = `Series de Calidad: ${repsText}`;
-              objective = "Mejorar el volumen de oxígeno máximo (VO2 Max) y la tolerancia neuromuscular al ritmo rápido.";
-              warmup = "15 minutos de rodaje suave progresivo + técnica de carrera + 3 rectas.";
-              mainWork = `Realizar ${repsText} en pista o asfalto plano con recuperación estática.`;
-              intensity = `Ritmo: ${ritText}.`;
-              recovery = recText;
-              cooldown = "10 minutos de trote muy suave regenerativo.";
-              physiologicalExplanation = "Las series cortas incrementan la capacidad buffer del músculo ante la acidez del lactato. Las series largas optimizan la eficiencia aeróbica e incrementan el umbral anaeróbico.";
-              fatigueAdaptation = "Si el readiness diario es menor a 55, sustituye inmediatamente por rodaje suave.";
-            } else if (d === 4) {
-              // Viernes: Tempo / Umbral según el manual
-              let kms = 4;
-              if (w === 1) kms = 4;
-              else if (w === 2) kms = 5;
-              else if (w === 3) kms = 6;
-              else if (w === 4) kms = 4; // descarga
-              else if (w === 5) kms = 7;
-              else if (w === 6) kms = 7;
-              else if (w === 7) kms = 8;
-              else kms = 4; // taper
-
-              name = `Tempo de Ritmo de Umbral - ${kms}K`;
-              objective = "Desarrollar la capacidad de sostener un ritmo elevado de forma constante durante más tiempo.";
-              warmup = "10 minutos de trote suave + movilidad dinámica rápida.";
-              mainWork = `Carrera continua sin pausa durante ${kms} kilómetros a ritmo tempo estable.`;
-              intensity = `Ritmo de Tempo: ${zones.tempo} (RPE 7-8).`;
-              recovery = "N/A (Esfuerzo continuo).";
-              cooldown = "5 minutos de trote suave de vuelta a la calma + estiramientos.";
-              physiologicalExplanation = "Entrena el cuerpo para reciclar el lactato y usarlo como combustible, retrasando la aparición de la fatiga a ritmos exigentes.";
-              fatigueAdaptation = "Si vas forzado, puedes dividirlo en 2 bloques con 1 minuto de caminata en medio.";
-            } else if (d === 6) {
-              // Domingo: Tirada larga según el manual
-              let kms = 10;
-              if (w === 1) kms = 10;
-              else if (w === 2) kms = 11;
-              else if (w === 3) kms = 12;
-              else if (w === 4) kms = 9; // descarga
-              else if (w === 5) kms = 12;
-              else if (w === 6) kms = 13;
-              else if (w === 7) kms = 10;
-              else kms = 6; // taper
-
-              name = `Tirada Larga de Resistencia - ${kms}K`;
-              objective = "Mejorar la base de fondo, resiliencia estructural de tendones y articulaciones.";
-              warmup = "10 minutos de trote suave + movilidad activa general.";
-              mainWork = `Carrera continua de fondo cubriendo ${kms} kilómetros.`;
-              intensity = `Ritmo suave: ${zones.suave} (RPE 3-4).`;
-              recovery = "N/A";
-              cooldown = "5 minutos de trote regenerativo + estiramientos dinámicos.";
-              physiologicalExplanation = "Incrementa la capilarización y el número de vasos sanguíneos que llegan a los músculos, mejorando el aporte de oxígeno.";
-              fatigueAdaptation = "Si tus articulaciones sufren, realiza la tirada larga un 5% más lento.";
-            } else {
-              // Miércoles u otro día: Rodaje suave para recuperar carga
-              name = "Rodaje de Base e Hidratación";
-              objective = "Recuperar activamente entre sesiones de calidad, acumulando kilómetros base.";
-              warmup = "5 minutos de movilidad articular de cadera.";
-              mainWork = "Trote suave continuo y cómodo de 30 a 45 minutos.";
-              intensity = `Ritmo regenerativo: ${zones.regenerative} (RPE 2-3).`;
-              recovery = "N/A";
-              cooldown = "Estiramientos suaves de pantorrillas y cuádriceps.";
-              physiologicalExplanation = "Estimula la eliminación de toxinas musculares mediante un riego sanguíneo constante a baja intensidad.";
-              fatigueAdaptation = "Si estás exhausto, camina 40 minutos rápido en lugar de correr.";
-            }
-          } else if (data.objective === RunningObjective.PRIMER_21K || data.objective === RunningObjective.MEJORAR_21K) {
-            // Media Maratón
-            if (isTaper && w === durationWeeks && d === 6) {
-              name = "¡Día de Media Maratón (21.1K)!";
-              objective = "Completar la carrera de fondo y cumplir tu meta con sensaciones óptimas.";
-              warmup = "10 minutos de movilidad general, caminata rápida y un leve trote de activación.";
-              mainWork = "Corre los 21.1 kilómetros dosificados de inicio a fin.";
-              intensity = `Ritmo objetivo: ${zones.tempo} (para mejorar) o RPE 5-6 controlado.`;
-              recovery = "Cuidado con la hidratación inicial con sales e ingesta de carbohidratos.";
-              cooldown = "Paseo suave y felicitaciones.";
-              physiologicalExplanation = "Demostración de la mejora de eficiencia energética de grasas y carbohidratos construida durante el plan.";
-              fatigueAdaptation = "Sal conservador en los primeros 5 km. La carrera de 21K se decide después del kilómetro 15.";
-            } else if (d === 6) {
-              // Tirada Larga de 21K
-              const baseTL = 12;
-              const kms = isDescarga ? Math.floor(baseTL * 0.8) : baseTL + Math.min(6, w);
-              name = `Tirada Larga Progresiva - ${kms}K`;
-              objective = "Consolidar la resistencia de fondo y probar la nutrición de geles/hidratación.";
-              warmup = "10 minutos de trote muy suave + movilidad de cadera.";
-              mainWork = `Carrera continua de ${kms} km. Si te sientes bien, corre los últimos 2 km a ritmo objetivo de carrera.`;
-              intensity = `Ritmo suave: ${zones.suave}. Paso por km: ${zones.suave}`;
-              recovery = "N/A";
-              cooldown = "10 minutos de estiramientos dinámicos y ducha fría en piernas.";
-              physiologicalExplanation = "Estrecha la conexión de tus fibras musculares, entrena el sistema gastrointestinal para absorber agua y carbohidratos en carrera.";
-              fatigueAdaptation = "Si notas molestias articulares, haz los últimos 2 kilómetros caminando.";
-            } else if (d === 1) {
-              // Series largas o cuestas
-              const reps = 3 + Math.floor(w / 3);
-              name = `Series de Resistencia Aeróbica - ${reps}x1000m`;
-              objective = "Desarrollar la potencia aeróbica máxima y el umbral de lactato.";
-              warmup = "15 minutos de trote progresivo + técnica de carrera.";
-              mainWork = `Realizar ${reps} series de 1000m recuperando parado.`;
-              intensity = `Ritmo de series largas: ${zones.seriesLargas}.`;
-              recovery = "Descanso de 2 minutos parado.";
-              cooldown = "10 minutos de trote muy fácil.";
-              physiologicalExplanation = "Aumenta la fuerza de contracción cardíaca, expandiendo el volumen sistólico del ventrículo izquierdo.";
-              fatigueAdaptation = "Si te sientes muy fatigado, haz tramos más cortos de 800m.";
-            } else {
-              name = "Tempo Controlado de Media Maratón";
-              objective = "Fijar el ritmo específico de carrera de fondo.";
-              warmup = "10 minutos de trote suave.";
-              mainWork = `Trote de ${25 + w * 2} minutos con bloques centrales a ritmo objetivo de media maratón.`;
-              intensity = `Ritmo controlado: ${zones.controlado} (RPE 5-6).`;
-              recovery = "N/A";
-              cooldown = "5 minutos de estiramientos.";
-              physiologicalExplanation = "Enseña al cuerpo a acumular fatiga sin desestabilizar la técnica de zancada eficiente.";
-              fatigueAdaptation = "Si las pulsaciones están disparadas, mantente solo en ritmo suave.";
-            }
-          } else if (data.objective === RunningObjective.MEJORAR_RITMO) {
-            // Speed improvement
-            if (d === 1) {
-              // Cortas
-              name = `Series Cortas de Velocidad - 8x200m`;
-              objective = "Mejorar la velocidad punta, el reclutamiento de fibras rápidas y la eficiencia biomecánica.";
-              warmup = "15 minutos de trote suave + técnica activa + 4 rectas acelerando.";
-              mainWork = "8 series de 200 metros en asfalto llano a intensidad máxima controlada.";
-              intensity = `Ritmo de series cortas: ${zones.seriesCortas} (RPE 9).`;
-              recovery = "Descanso de 2 minutos caminando lento.";
-              cooldown = "10 minutos de trote lento.";
-              physiologicalExplanation = "Aumenta el reclutamiento muscular rápido e incrementa la rigidez del tendón de Aquiles, mejorando el retorno de energía de cada pisada.";
-              fatigueAdaptation = "Si notas algún tirón en los isquios o gemelos, aborta y camina.";
-            } else if (d === 4) {
-              // Tempo Intenso
-              name = "Tempo Intenso de Umbral de Lactato";
-              objective = "Subir el umbral láctico y tolerar esfuerzos de ritmo alto continuo.";
-              warmup = "10 minutos de trote progresivo.";
-              mainWork = `Corre continuamente por 20 minutos a ritmo de Tempo fuerte.`;
-              intensity = `Ritmo de Tempo: ${zones.tempo} (RPE 8).`;
-              recovery = "N/A";
-              cooldown = "10 minutos de vuelta a la calma muy suave.";
-              physiologicalExplanation = "Al entrenar justo debajo del umbral de lactato, enseñas a tus células a asimilar la acidosis muscular de forma más eficiente.";
-              fatigueAdaptation = "Si no puedes sostenerlo, haz bloques de 5 minutos con 1 minuto de trote muy fácil.";
-            } else {
-              name = "Rodaje Fácil Regenerativo";
-              objective = "Recuperar el sistema neuromuscular tras la sesión de velocidad.";
-              warmup = "5 minutos de movilidad general.";
-              mainWork = "Trote suave de 30-40 minutos sin mirar el reloj.";
-              intensity = `Ritmo muy suave / regenerativo: ${zones.regenerative} (RPE 3).`;
-              recovery = "N/A";
-              cooldown = "Movilidad articular general de cadera.";
-              physiologicalExplanation = "La baja intensidad estimula la hormona de crecimiento y el flujo sanguíneo reparador, limpiando metabolitos residuales.";
-              fatigueAdaptation = "Si estás cansado mentalmente, realiza una sesión alternativa de ciclismo suave o elíptica.";
-            }
-          } else {
-            // MEJORAR_RESISTENCIA
-            if (d === 6) {
-              // Tirada larga es clave
-              const baseEndurance = 8;
-              const kms = isDescarga ? Math.floor(baseEndurance * 0.8) : baseEndurance + Math.floor(w * 1.05); // increases 5% approx
-              name = `Tirada Larga Aeróbica - ${kms}K`;
-              objective = "Aumentar el límite de resistencia y acondicionamiento estructural.";
-              warmup = "10 minutos de movilidad articular de tobillos y rodillas.";
-              mainWork = `Carrera continua y cómoda cubriendo ${kms} kilómetros de forma regular.`;
-              intensity = `Ritmo suave / fácil: ${zones.suave} (RPE 3-4).`;
-              recovery = "N/A";
-              cooldown = "Caminata de 5 min + hidratación completa.";
-              physiologicalExplanation = "Promueve la biogénesis mitocondrial y aumenta la capilarización en las piernas, dándole más gasolina a tus músculos de fondo.";
-              fatigueAdaptation = "Si tus piernas pesan demasiado, camina durante 1 minuto por cada 5 kilómetros.";
-            } else if (d === 1) {
-              name = "Tempo Moderado por Intervalos";
-              objective = "Desarrollar la fuerza aeróbica y resistencia cardiovascular.";
-              warmup = "10 minutos de trote muy fácil.";
-              mainWork = `Realizar 3 bloques de 8 minutos a ritmo controlado con 2 minutos de caminata entre bloques.`;
-              intensity = `Ritmo controlado: ${zones.controlado} (RPE 5-6).`;
-              recovery = "2 minutos de caminata lenta entre intervalos.";
-              cooldown = "5 minutos de trote suave.";
-              physiologicalExplanation = "Divide el esfuerzo para mantener una intensidad de umbral adecuada sin fatiga extrema del sistema nervioso central.";
-              fatigueAdaptation = "Si te sientes cansado, acorta los bloques a 6 minutos.";
-            } else {
-              name = "Rodaje Suave de Base Aeróbica";
-              objective = "Incrementar de forma segura el kilometraje semanal de base.";
-              warmup = "5 minutos de movilidad activa.";
-              mainWork = `Trote continuo y fluido de 40 minutos.`;
-              intensity = `Ritmo suave: ${zones.suave} (RPE 3-4).`;
-              recovery = "N/A";
-              cooldown = "Toma de pulsaciones y estiramientos suaves.";
-              physiologicalExplanation = "Estimula la adaptación de los huesos y tendones para tolerar las fuerzas de impacto repetidas del running.";
-              fatigueAdaptation = "Si hay molestias o dolor leve, detén el trote y camina.";
-            }
-          }
-        }
-      }
+      const content = buildDaySessionContent(w, d, data, zones, isDescarga, isTaper, durationWeeks);
 
       sessions.push({
         id: sessionId,
         dayIndex: d,
-        type,
-        name,
-        objective,
-        warmup,
-        mainWork,
-        intensity,
-        recovery,
-        cooldown,
-        physiologicalExplanation,
-        fatigueAdaptation,
-        isCompleted: false,
-        isLongRun: /^Tirada Larga/.test(name)
+        ...content,
+        isCompleted: false
       });
     }
+
+    // Semana de descarga: la última carrera de la semana se convierte en el día obligatorio de
+    // repetición del Test VAM (Módulo 10 del RUNNING_AI_DECISION_ENGINE, cada 4 semanas).
+    applyVamRetestOverride(sessions, isDescarga);
 
     weeks.push({
       weekNumber: w,
       isDescarga,
       isTaper,
-      description: isTaper 
+      description: isTaper
         ? "Semana de descarga y supercompensación. Reducción drástica del volumen (-40%) para asimilar el entrenamiento y llegar con frescura total al test final."
-        : isDescarga 
-          ? "Semana de asimilación y descarga activa. Reducimos el volumen un 25-30% para disipar la fatiga acumulada de las semanas anteriores."
+        : isDescarga
+          ? "Semana de asimilación y descarga activa. Reducimos el volumen un 25-30% para disipar la fatiga acumulada de las semanas anteriores. Incluye repetición obligatoria del Test VAM."
           : `Semana de carga progresiva enfocada en desarrollar ${limitants.mainLimitant.toLowerCase()} de forma segura.`,
       sessions
     });
@@ -1040,6 +977,44 @@ export function generateTrainingPlan(data: OnboardingData): TrainingPlan {
 }
 
 // ============================================================================
+// MÓDULO 9 Y 10 (recálculo tras repetir el Test VAM)
+// Recalcula zonas de ritmo y predictor de marcas con el VAM nuevo, y reescribe el contenido de
+// todas las sesiones AÚN NO completadas (pasadas o futuras). Las sesiones ya completadas conservan
+// su histórico tal y como se entrenaron. No cambia duración, fases ni estructura semanal del plan.
+// ============================================================================
+
+export function recalculateFuturePlanSessions(
+  plan: TrainingPlan,
+  data: OnboardingData,
+  newVamKmH: number
+): TrainingPlan {
+  const zones = calculateTrainingZones(newVamKmH);
+  const estimatedPaces = predictMarks(newVamKmH);
+
+  const weeks: WeeklyPlan[] = plan.weeks.map(week => {
+    const sessions = week.sessions.map(session => {
+      if (session.isCompleted) return session;
+      const content = buildDaySessionContent(week.weekNumber, session.dayIndex, data, zones, week.isDescarga, week.isTaper, plan.durationWeeks);
+      return { ...session, ...content };
+    });
+
+    applyVamRetestOverride(sessions, week.isDescarga);
+
+    return { ...week, sessions };
+  });
+
+  return {
+    ...plan,
+    zones,
+    initialDiagnostic: {
+      ...plan.initialDiagnostic,
+      estimatedPaces
+    },
+    weeks
+  };
+}
+
+// ============================================================================
 // RUNNING DAILY EXECUTION ENGINE (DAILY_EXECUTION_ENGINE)
 // ============================================================================
 
@@ -1051,7 +1026,7 @@ export function runDailyExecutionEngine(
   jointSorenessScore: number = 1, // Dolor articular o tendinoso
   muscleSorenessScore: number = 1 // Dolor muscular
 ): AdaptedWorkoutResult {
-  
+
   let adaptedWorkout: WorkoutSession | null = { ...originalWorkout };
   let status: "mantener" | "adaptado" | "reducido" | "sustituido" | "cancelado" = "mantener";
   let justification = "El nivel de Readiness es óptimo y no se reportan dolores o lesiones que impidan la sesión. Mantener la planificación original.";
@@ -1159,7 +1134,7 @@ export function runDailyExecutionEngine(
   }
 
   // REGLA 2: CALIDAD (Series/Tempo/Cuestas) Y Readiness < 55
-  const isCalidad = 
+  const isCalidad =
     originalWorkout.name.toLowerCase().includes("series") ||
     originalWorkout.name.toLowerCase().includes("tempo") ||
     originalWorkout.name.toLowerCase().includes("intervalos") ||
@@ -1187,10 +1162,10 @@ export function runDailyExecutionEngine(
   // REGLA: REDUCIR VOLUMEN SI READINESS ENTRE 55 y 69
   if (readinessScore >= 55 && readinessScore <= 69) {
     status = "reducido";
-    
+
     if (originalWorkout.type === "carrera") {
       let mainWorkAdapted = originalWorkout.mainWork;
-      
+
       if (originalWorkout.mainWork.includes("series") || originalWorkout.mainWork.includes("series")) {
         // e.g. "8 series de..." -> "6 series de..."
         mainWorkAdapted = "Reducir en 1 o 2 series el volumen total planificado. Ej: " + originalWorkout.mainWork + " (hacer 1-2 series menos).";

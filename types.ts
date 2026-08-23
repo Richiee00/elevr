@@ -31,10 +31,10 @@ export interface OnboardingData {
   experienceLevel?: ExperienceLevel; // for PRIMER_10K
   frequency: FrequencyOption;
   
-  // Performance data (as entered by user)
+  // Performance data (as entered by user). Diagnóstico e hitos a batir, NUNCA fuente de los ritmos
+  // de entrenamiento: los ritmos siempre se calculan a partir del Test VAM (ver RunningVAMTestResult).
   time10K?: string; // hh:mm:ss or mm:ss
   time21K?: string; // hh:mm:ss or mm:ss
-  vamTestDistance?: number; // meters in 5 minutes
   maxDistanceCurrent?: "less_5" | "5_10" | "10_15" | "more_15"; // for MEJORAR_RESISTENCIA
   resistanceTarget?: "run_10k" | "run_15k" | "run_21k" | "general"; // for MEJORAR_RESISTENCIA
   
@@ -44,6 +44,16 @@ export interface OnboardingData {
   injuryNotes?: string;
   
   completedAt?: string;
+}
+
+// Resultado del Test VAM (Velocidad Aeróbica Máxima): esfuerzo máximo sostenido durante
+// RUNNING_VAM_TEST_DURATION_MIN minutos. Única fuente de los ritmos de entrenamiento: obligatorio
+// antes de generar el plan y se repite cada 4 semanas (semana de descarga) para mantenerlos vigentes.
+export interface RunningVAMTestResult {
+  distanceMeters: number;
+  vamKmH: number;
+  vamPaceMinKm: string; // ritmo equivalente, formato mm:ss /km
+  completedAt: string;
 }
 
 export interface TrainingZones {
@@ -79,7 +89,7 @@ export interface WorkoutSession {
   isCompleted: boolean;
   feedback?: "perfecto" | "adecuado" | "muy_duro" | "facil" | "incompleto" | "no_realizado";
   rpeGiven?: number; // 1-10
-  isLongRun?: boolean; // Tirada larga aeróbica: habilita el registro de resultado real para recalcular el predictor de marcas.
+  isVamRetest?: boolean; // día de repetición obligatoria del Test VAM (última carrera de cada semana de descarga)
 }
 
 export interface WeeklyPlan {
@@ -148,26 +158,11 @@ export interface AdaptedWorkoutResult {
   recoveryRecommendation: string;
 }
 
-export interface WorkoutCompletionRecord {
-  feedback: string;
-  rpe: number;
-  date: string;
-  actualDistanceKm?: number; // Solo para sesiones isLongRun: distancia realmente recorrida.
-  actualTimeSeconds?: number; // Solo para sesiones isLongRun: tiempo total invertido.
-}
-
-export interface RunningVAMTestResult {
-  distanceMeters: number;
-  vamKmH: number;
-  vamPaceMinKm: string;
-  completedAt: string;
-}
-
 export interface AppState {
   onboarding: OnboardingData | null;
   plan: TrainingPlan | null;
   currentWeekIndex: number;
   readinessHistory: Record<string, DailyReadinessInput>; // Key: YYYY-MM-DD
-  completedWorkouts: Record<string, WorkoutCompletionRecord>; // Key: workoutId
+  completedWorkouts: Record<string, { feedback: string; rpe: number; date: string }>; // Key: workoutId
   activeTab: "landing" | "onboarding" | "dashboard" | "plan" | "today" | "readiness" | "settings";
 }

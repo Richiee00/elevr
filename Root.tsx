@@ -6,7 +6,7 @@ import Landing from "./Landing";
 import DisciplineSelect, { Discipline } from "./DisciplineSelect";
 import Onboarding from "./Onboarding";
 import HyroxOnboarding from "./HyroxOnboarding";
-import { OnboardingData } from "./types";
+import { OnboardingData, RunningVAMTestResult } from "./types";
 import { generateTrainingPlan } from "./engines";
 import { HyroxOnboardingData } from "./hyroxTypes";
 import { generateHyroxPlan } from "./hyroxEngine";
@@ -29,11 +29,13 @@ export default function Root() {
   // en vez de como el primer paso del onboarding, para poder volver directamente a ella con "Atrás".
   const [switchOrigin, setSwitchOrigin] = useState<Stage | null>(null);
 
-  const handleCompleteRunning = (data: OnboardingData) => {
-    const plan = generateTrainingPlan(data);
+  const handleCompleteRunning = (data: OnboardingData, vamTest: RunningVAMTestResult) => {
+    const plan = generateTrainingPlan(data, vamTest.vamKmH);
     localStorage.setItem("run_plan_onboarding", JSON.stringify(data));
     localStorage.setItem("run_plan_data", JSON.stringify(plan));
     localStorage.setItem("run_plan_current_week", "0");
+    localStorage.setItem("run_plan_vam_test", JSON.stringify(vamTest));
+    localStorage.setItem("run_plan_vam_history", JSON.stringify([vamTest]));
     localStorage.setItem("elevr_active_app", "running");
     setStage("app-running");
   };
