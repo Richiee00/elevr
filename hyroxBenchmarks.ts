@@ -1,6 +1,15 @@
 // Hyrox performance benchmark tables. Confirmed by the user against their own real data
 // for open_masculina, open_femenina, pro_masculina y pro_femenina (2026-08-18).
-import { HyroxRaceCategory, HyroxBenchmarkBand } from "./hyroxTypes";
+import {
+  HyroxRaceCategory,
+  HyroxBenchmarkBand,
+  HyroxOfficialLoadRow,
+  HyroxPhase,
+  HyroxDivision,
+  HyroxExperienceLevel,
+  HyroxSessionDurationMin,
+  HyroxFrequencyOption
+} from "./hyroxTypes";
 
 export interface HyroxBenchmarkRow {
   run1km: Record<HyroxBenchmarkBand, string>;
@@ -74,4 +83,99 @@ export const HYROX_DEBUTANTE_RANGE: Record<HyroxRaceCategory, [string, string]> 
   pro_masculina: ["1:25", "1:50"],
   pro_femenina: ["1:35", "2:00"],
 };
+
+// ============================================================================
+// CEREBRO v3, OBJETIVO 1 — BLOQUE A: cargas oficiales por categoría.
+// Verificar contra el reglamento vigente de la temporada: HYROX las revisa periódicamente.
+// ============================================================================
+export const HYROX_OFFICIAL_LOADS: Record<HyroxRaceCategory, HyroxOfficialLoadRow> = {
+  open_femenina: { sledPushKg: 102, sledPullKg: 78, farmersCarryKgPerHand: 16, sandbagLungesKg: 10, wallBallsKg: 4, wallBallsTargetM: 2.74, wallBallsReps: 75 },
+  open_masculina: { sledPushKg: 152, sledPullKg: 103, farmersCarryKgPerHand: 24, sandbagLungesKg: 20, wallBallsKg: 6, wallBallsTargetM: 3.05, wallBallsReps: 75 },
+  pro_femenina: { sledPushKg: 152, sledPullKg: 103, farmersCarryKgPerHand: 24, sandbagLungesKg: 20, wallBallsKg: 6, wallBallsTargetM: 2.74, wallBallsReps: 100 },
+  pro_masculina: { sledPushKg: 202, sledPullKg: 153, farmersCarryKgPerHand: 32, sandbagLungesKg: 30, wallBallsKg: 9, wallBallsTargetM: 3.05, wallBallsReps: 100 },
+};
+
+// Progresión de carga por fase (bloque A): fracción de la carga oficial usada en cada fase del
+// plan de "Preparar mi primer HYROX". La fase "carrera" (semana final con fecha de competición)
+// usa prácticamente el 100% oficial.
+export const HYROX_LOAD_PHASE_PCT: Record<HyroxPhase, [number, number]> = {
+  base: [0.55, 0.65],
+  desarrollo: [0.65, 0.80],
+  especifica: [0.80, 0.95],
+  carrera: [0.95, 1.00],
+};
+
+// ============================================================================
+// CEREBRO v3, OBJETIVO 1 — BLOQUE B: escalado por duración de sesión (45/60/90 min).
+// El multiplicador de volumen se aplica a rondas/reps/distancia de bloques de acondicionamiento,
+// carrera y simulación. Las series y el ajuste de top-set solo aplican al bloque de fuerza.
+// ============================================================================
+export const HYROX_DURATION_VOLUME_MULTIPLIER: Record<HyroxSessionDurationMin, number> = {
+  45: 0.70,
+  60: 1.00,
+  90: 1.35,
+};
+
+export const HYROX_DURATION_STRENGTH_SERIES: Record<HyroxSessionDurationMin, number> = {
+  45: 3,
+  60: 4,
+  90: 5,
+};
+
+// Puntos porcentuales sumados/restados sobre el % de fase (tabla A) para el top-set del bloque
+// de fuerza principal, no para los bloques accesorios.
+export const HYROX_DURATION_TOPSET_ADJUST_PP: Record<HyroxSessionDurationMin, number> = {
+  45: -5,
+  60: 0,
+  90: 5,
+};
+
+// ============================================================================
+// CEREBRO v3, OBJETIVO 1 — BLOQUE C: escalado por nivel real de base (running/fuerza).
+// "rangeExtreme" se traduce en un multiplicador adicional sobre el volumen ya escalado por duración.
+// ============================================================================
+export interface HyroxLevelRule {
+  rirRange: [number, number];
+  rpeCeiling: number;
+  maxStationsPartialSim: number | "completa";
+  rangeExtreme: "bajo" | "medio" | "alto";
+  rangeExtremeMultiplier: number;
+}
+
+export const HYROX_LEVEL_RULES: Record<HyroxExperienceLevel, HyroxLevelRule> = {
+  principiante: { rirRange: [4, 5], rpeCeiling: 6, maxStationsPartialSim: 4, rangeExtreme: "bajo", rangeExtremeMultiplier: 0.85 },
+  intermedio: { rirRange: [3, 4], rpeCeiling: 7, maxStationsPartialSim: 6, rangeExtreme: "medio", rangeExtremeMultiplier: 1.00 },
+  avanzado: { rirRange: [2, 3], rpeCeiling: 8, maxStationsPartialSim: "completa", rangeExtreme: "alto", rangeExtremeMultiplier: 1.15 },
+};
+
+// ============================================================================
+// CEREBRO v3, OBJETIVO 1 — BLOQUE D: intensidad por categoría (Open vs Pro).
+// ============================================================================
+export interface HyroxDivisionBias {
+  difficultyBias: 0 | 1; // se suma al nivel de dificultad preferido al elegir plantilla
+  zoneOffsetRangeSecPerKm: [number, number]; // offset sobre ritmo umbral
+  restReductionPct: number; // reducción de descanso entre series de fuerza
+}
+
+export const HYROX_DIVISION_BIAS: Record<HyroxDivision, HyroxDivisionBias> = {
+  open: { difficultyBias: 0, zoneOffsetRangeSecPerKm: [15, 35], restReductionPct: 0 },
+  pro: { difficultyBias: 1, zoneOffsetRangeSecPerKm: [0, 20], restReductionPct: 12 },
+};
+
+// ============================================================================
+// CEREBRO v3, OBJETIVO 1 — BLOQUE F: rangos de mejora esperados según frecuencia semanal.
+// Orientativos de coaching, nunca una promesa.
+// ============================================================================
+export const HYROX_IMPROVEMENT_RANGES: Record<"2" | "3-4" | "5-6", { pct8Weeks: [number, number]; pct12Weeks: [number, number] }> = {
+  "2": { pct8Weeks: [3, 6], pct12Weeks: [5, 8] },
+  "3-4": { pct8Weeks: [6, 10], pct12Weeks: [9, 13] },
+  "5-6": { pct8Weeks: [10, 15], pct12Weeks: [13, 18] },
+};
+
+export function getHyroxImprovementFrequencyBucket(frequency: HyroxFrequencyOption): "2" | "3-4" | "5-6" {
+  const n = Number(frequency);
+  if (n <= 2) return "2";
+  if (n <= 4) return "3-4";
+  return "5-6";
+}
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { HyroxOnboardingData, HyroxTrainingPlan } from "./hyroxTypes";
-import { HyroxDailyInput, adaptHyroxSession, generateHyroxSessionContent, getCachedGeneratedSession, resolveHyroxSessionTemplate } from "./hyroxEngine";
+import { HyroxDailyInput, adaptHyroxSession, generateHyroxSessionContent, getCachedGeneratedSession, resolveHyroxSessionTemplate, buildHyroxLoadContextNote } from "./hyroxEngine";
 import { CATEGORY_LABELS } from "./hyroxLibrary";
 import HyroxWorkoutDetail from "./HyroxWorkoutDetail";
 import HyroxReadinessCard from "./HyroxReadinessCard";
@@ -62,7 +62,10 @@ export default function HyroxTodayWorkoutView({
       isDescarga: activeWeek.isDescarga,
       injuryAreas: onboarding.activeInjury ? onboarding.injuryAreas : [],
       weekNumber: activeWeek.weekNumber,
-      durationWeeks: plan.durationWeeks
+      durationWeeks: plan.durationWeeks,
+      raceCategory: onboarding.raceCategory,
+      division: onboarding.division,
+      loadContextNote: buildHyroxLoadContextNote(onboarding, activeWeek.weekNumber, plan.durationWeeks)
     }).then(result => {
       if (!cancelled && result) setGeneratedVersion(v => v + 1);
     });
@@ -73,7 +76,9 @@ export default function HyroxTodayWorkoutView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewedSession.id]);
 
-  const template = resolveHyroxSessionTemplate(viewedSession);
+  const template = onboarding
+    ? resolveHyroxSessionTemplate(viewedSession, { onboarding, weekNumber: activeWeek.weekNumber, durationWeeks: plan.durationWeeks })
+    : resolveHyroxSessionTemplate(viewedSession);
   // generatedVersion se referencia únicamente para forzar el re-render cuando Gemini termina de generar.
   void generatedVersion;
 

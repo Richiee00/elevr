@@ -191,6 +191,7 @@ export default function HyroxApp({ onSwitchDiscipline, onResetToLanding }: Hyrox
             <motion.div key="plan" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
               <HyroxWeeklyPlanView
                 plan={plan}
+                onboarding={onboarding}
                 currentWeekIndex={currentWeekIndex}
                 onSetCurrentWeek={handleSetCurrentWeekIndex}
                 onLogWorkoutCompletion={handleLogWorkoutCompletion}
@@ -203,7 +204,7 @@ export default function HyroxApp({ onSwitchDiscipline, onResetToLanding }: Hyrox
 
           {activeTab === "calendar" && plan && (
             <motion.div key="calendar" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-              <HyroxCalendarView plan={plan} completedWorkouts={completedWorkouts} />
+              <HyroxCalendarView plan={plan} onboarding={onboarding} completedWorkouts={completedWorkouts} />
             </motion.div>
           )}
 

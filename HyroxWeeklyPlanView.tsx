@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion } from "motion/react";
-import { HyroxTrainingPlan, HyroxCategory, HyroxWorkoutSession } from "./hyroxTypes";
+import { HyroxTrainingPlan, HyroxCategory, HyroxWorkoutSession, HyroxOnboardingData } from "./hyroxTypes";
 import { HyroxDailyInput, adaptHyroxSession, resolveHyroxSessionTemplate } from "./hyroxEngine";
 import { CATEGORY_LABELS } from "./hyroxLibrary";
 import HyroxWorkoutCard from "./HyroxWorkoutCard";
@@ -10,6 +10,7 @@ import { Calendar, Moon, BrainCircuit, ChevronDown, ChevronUp } from "lucide-rea
 
 interface HyroxWeeklyPlanViewProps {
   plan: HyroxTrainingPlan;
+  onboarding: HyroxOnboardingData | null;
   currentWeekIndex: number;
   onSetCurrentWeek: (idx: number) => void;
   onLogWorkoutCompletion: (sessionId: string, feedback: string, rpe: number) => void;
@@ -30,6 +31,7 @@ const FILTERS: Array<{ val: "all" | HyroxCategory; label: string }> = [
 
 export default function HyroxWeeklyPlanView({
   plan,
+  onboarding,
   currentWeekIndex,
   onSetCurrentWeek,
   onLogWorkoutCompletion,
@@ -172,7 +174,9 @@ export default function HyroxWeeklyPlanView({
             );
           }
 
-          const template = resolveHyroxSessionTemplate(session);
+          const template = onboarding
+            ? resolveHyroxSessionTemplate(session, { onboarding, weekNumber: activeWeek.weekNumber, durationWeeks: plan.durationWeeks })
+            : resolveHyroxSessionTemplate(session);
           if (!template) return null;
 
           return (

@@ -232,6 +232,14 @@ export default function HyroxDashboard({ plan, activeInjury, injuryAreas, comple
                   </div>
                 </div>
 
+                {initialDiagnostic.expectedImprovement && (
+                  <p className="text-[11px] text-zinc-500 font-medium leading-relaxed mt-4">
+                    Mejora esperable con tu frecuencia semanal: {initialDiagnostic.expectedImprovement.pct8Weeks[0]}-{initialDiagnostic.expectedImprovement.pct8Weeks[1]}%
+                    en 8 semanas, {initialDiagnostic.expectedImprovement.pct12Weeks[0]}-{initialDiagnostic.expectedImprovement.pct12Weeks[1]}% en 12 semanas. Es una
+                    expectativa orientativa, no una promesa.
+                  </p>
+                )}
+
                 {!vamTest && (
                   <p className="text-[11px] text-zinc-400 font-medium leading-relaxed mt-4">
                     Completa el Test VAM en cualquier momento para desbloquear además tus zonas de ritmo reales en el Perfil.

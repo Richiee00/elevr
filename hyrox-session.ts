@@ -75,7 +75,10 @@ function buildPrompt(input: Record<string, any>): string {
     isDescarga,
     injuryAreas,
     weekNumber,
-    durationWeeks
+    durationWeeks,
+    raceCategory,
+    division,
+    loadContextNote
   } = input;
 
   const focusLine = limitantType
@@ -96,18 +99,30 @@ function buildPrompt(input: Record<string, any>): string {
     ? "Esta es una semana de descarga: reduce volumen e intensidad un 30-40% respecto a una semana normal."
     : `Semana ${weekNumber} de ${durationWeeks} del plan: progresión de carga normal.`;
 
+  // Cerebro v3, Objetivo 1, bloques A y D: categoría de competición (sexo + división) y sesgo de
+  // intensidad por división, para que la sesión generada no sea idéntica entre open/pro ni entre sexos.
+  const categoryLine = raceCategory ? `Categoría de competición del atleta: ${raceCategory}.` : "";
+  const divisionLine =
+    division === "pro"
+      ? "División Pro: usa un nivel de dificultad más alto (prefiere ALTA o MODERADA sobre BAJA salvo que sea semana de descarga) y descansos entre series un 10-15% más cortos que en Open."
+      : "División Open: dificultad normal según la fase, sin necesidad de forzar el nivel más alto.";
+  const loadLine2 = loadContextNote ? String(loadContextNote) : "";
+
   return `Eres el motor de generación de sesiones de un entrenador de Hyrox. Genera UNA sesión de entrenamiento nueva, coherente con el método Hyrox oficial (formatos rounds/AMRAP/EMOM/for_time/intervals/on_off, las 8 estaciones oficiales + carrera), en español, para un atleta con las siguientes condiciones:
 
 Categoría de la sesión: ${category}.
 Objetivo del atleta: ${objective}.
 Nivel de experiencia: ${experienceLevel}.
 Duración objetivo de la sesión: ${sessionDurationMin} minutos.
+${categoryLine}
+${divisionLine}
 ${focusLine}
 ${gymLine}
 ${injuryLine}
 ${loadLine}
+${loadLine2}
 
-Devuelve una sesión original y variada (evita ser repetitiva respecto a plantillas genéricas), con bloques y ejercicios realistas y ejecutables, usando exclusivamente los formatos y estaciones permitidos por el esquema de respuesta.`;
+Devuelve una sesión original y variada (evita ser repetitiva respecto a plantillas genéricas), con bloques y ejercicios realistas y ejecutables, usando exclusivamente los formatos y estaciones permitidos por el esquema de respuesta. Si la sesión es de categoría "fuerza" y usa Sled Push, Sled Pull, Farmers Carry o Sandbag Lunges, usa las cargas indicadas arriba en vez de un porcentaje genérico de 1RM.`;
 }
 
 export default async function handler(req: any, res: any) {
