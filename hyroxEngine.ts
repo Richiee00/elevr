@@ -423,9 +423,13 @@ const HYROX_RACE_FATIGUE_FACTORS = [0.98, 1.0, 1.01, 1.02, 1.03, 1.04, 1.05, 1.0
 
 // Ritmo umbral estimado a partir del Test VAM: el cerebro lista "Test VAM" como método válido
 // para calcular el ritmo umbral (misma convención que el módulo de running: ~85% de la velocidad VAM).
+function getHyroxThresholdPaceSecPerKm(vamKmH: number): number {
+  return 3600 / vamKmH / 0.85;
+}
+
 function estimateHyroxRunningSecondsFromVAM(vamKmH: number, zoneOffsetSecPerKm: number): number {
   if (vamKmH <= 0) return 0;
-  const thresholdPaceSecPerKm = 3600 / vamKmH / 0.85;
+  const thresholdPaceSecPerKm = getHyroxThresholdPaceSecPerKm(vamKmH);
   const zonePaceSecPerKm = Math.max(120, thresholdPaceSecPerKm + zoneOffsetSecPerKm);
   return HYROX_RACE_FATIGUE_FACTORS.reduce((sum, f) => sum + zonePaceSecPerKm * f, 0);
 }
@@ -501,6 +505,19 @@ export function getHyroxExpectedImprovement(frequency: HyroxFrequencyOption): { 
   return HYROX_IMPROVEMENT_RANGES[getHyroxImprovementFrequencyBucket(frequency)];
 }
 
+// Cerebro v3, Objetivo 1, bloque E: offset de zona "realista" (segundos por km respecto al ritmo
+// umbral) según división (Open/Pro) y dosis de entrenamiento. Se reutiliza tanto para el predictor
+// de tiempo de carrera como para mostrar el ritmo objetivo real dentro de las sesiones de carrera.
+function getHyroxRealisticZoneOffsetSecPerKm(data: HyroxOnboardingData, doseScore: number): number {
+  const divisionBias = HYROX_DIVISION_BIAS[data.division];
+  const [biasFast, biasSlow] = divisionBias.zoneOffsetRangeSecPerKm;
+  let offsetRealista = lerp(biasSlow, biasFast, doseScore);
+  if (data.runningExperience === HyroxExperienceLevel.INTERMEDIO || data.runningExperience === HyroxExperienceLevel.AVANZADO) {
+    offsetRealista -= 4;
+  }
+  return offsetRealista;
+}
+
 export function estimateHyroxFinishTime(data: HyroxOnboardingData, vamKmH?: number): { conservador: string; realista: string; agresivo?: string } {
   if (data.objective === HyroxObjective.PRIMERA_CARRERA) {
     // Cerebro v3, Objetivo 1, bloque E: predictor ajustado por Test VAM (o ancla de categoría si no
@@ -508,14 +525,9 @@ export function estimateHyroxFinishTime(data: HyroxOnboardingData, vamKmH?: numb
     // por categoría igual para cualquier atleta de esa categoría.
     const durationWeeksForDose = computeDurationWeeks(data);
     const doseScore = computeHyroxTrainingDoseScore(data.frequency, durationWeeksForDose);
-    const divisionBias = HYROX_DIVISION_BIAS[data.division];
 
     if (vamKmH && vamKmH > 0) {
-      const [biasFast, biasSlow] = divisionBias.zoneOffsetRangeSecPerKm;
-      let offsetRealista = lerp(biasSlow, biasFast, doseScore);
-      if (data.runningExperience === HyroxExperienceLevel.INTERMEDIO || data.runningExperience === HyroxExperienceLevel.AVANZADO) {
-        offsetRealista -= 4;
-      }
+      const offsetRealista = getHyroxRealisticZoneOffsetSecPerKm(data, doseScore);
       const offsetConservador = offsetRealista + 15;
       const offsetAgresivo = Math.max(0, offsetRealista - 10);
 
@@ -837,10 +849,10 @@ function computeDurationWeeks(data: HyroxOnboardingData): number {
   return 8;
 }
 
-export function generateHyroxPlan(data: HyroxOnboardingData): HyroxTrainingPlan {
+export function generateHyroxPlan(data: HyroxOnboardingData, vamKmH?: number): HyroxTrainingPlan {
   const { bmi, category: bmiCategory } = calculateBMI(data.weight, data.height);
   const limitantInfo = detectHyroxLimitant(data);
-  const estimatedFinishTime = estimateHyroxFinishTime(data);
+  const estimatedFinishTime = estimateHyroxFinishTime(data, vamKmH);
 
   const durationWeeks = computeDurationWeeks(data);
   const sessionsPerWeek = frequencyToNumber(data.frequency);
@@ -1091,14 +1103,45 @@ export function buildHyroxLoadContextNote(onboarding: HyroxOnboardingData, weekN
   return `Cargas para esta fase (${phase}) en la categoría ${category}: Sled Push ~${sledPush} kg, Sled Pull ~${sledPull} kg, Farmers Carry ~${farmers} kg por mano, Sandbag Lunges ~${sandbag} kg, Wall Balls balón ${official.wallBallsKg} kg a diana de ${official.wallBallsTargetM} m (usa reps por debajo de las ${official.wallBallsReps} oficiales cuanto más lejos esté la fase de la carrera).`;
 }
 
+// Cerebro v3, sección HYROX RUNNING PREDICTION ENGINE: una vez existe Test VAM, las sesiones de
+// carrera dejan de mostrar la intensidad como "% ritmo umbral" abstracto y muestran el ritmo real
+// en min/km — misma idea que el módulo de running (zonas de ritmo calculadas, no porcentajes).
+const PACE_ZONE_PCT_DETAIL = /^(\d+)% ritmo umbral$/;
+
+function applyHyroxPaceZoneToExercise(ex: HyroxExercise, vamKmH: number, raceOffsetSecPerKm: number): HyroxExercise {
+  if (ex.station !== "run" || !ex.detail) return ex;
+  const thresholdPaceSecPerKm = getHyroxThresholdPaceSecPerKm(vamKmH);
+
+  const pctMatch = ex.detail.match(PACE_ZONE_PCT_DETAIL);
+  if (pctMatch) {
+    const pct = Number(pctMatch[1]);
+    const paceSecPerKm = pct > 0 ? (thresholdPaceSecPerKm * 100) / pct : thresholdPaceSecPerKm;
+    return { ...ex, detail: `Ritmo objetivo: ${formatPaceMinKm(paceSecPerKm / 60)}/km` };
+  }
+
+  if (ex.detail === "Ritmo objetivo de carrera") {
+    const paceSecPerKm = thresholdPaceSecPerKm + raceOffsetSecPerKm;
+    return { ...ex, detail: `Ritmo objetivo: ${formatPaceMinKm(paceSecPerKm / 60)}/km` };
+  }
+
+  return ex;
+}
+
+function applyHyroxPaceZonesToBlock(block: HyroxBlock, vamKmH: number, raceOffsetSecPerKm: number): HyroxBlock {
+  return { ...block, exercises: block.exercises.map(ex => applyHyroxPaceZoneToExercise(ex, vamKmH, raceOffsetSecPerKm)) };
+}
+
 export interface HyroxSessionScalingContext {
   onboarding: HyroxOnboardingData;
   weekNumber: number;
   durationWeeks: number;
+  // Del Test VAM más reciente (obligatorio en el onboarding de Objetivo 1, opcional en el resto).
+  // Sin él, las sesiones de carrera siguen mostrando la intensidad como "% ritmo umbral".
+  vamKmH?: number;
 }
 
 export function scaleHyroxTemplateForContext(template: HyroxWorkoutTemplate, context: HyroxSessionScalingContext): HyroxWorkoutTemplate {
-  const { onboarding, weekNumber, durationWeeks } = context;
+  const { onboarding, weekNumber, durationWeeks, vamKmH } = context;
   const phase = computeHyroxPhase(weekNumber, durationWeeks, !!onboarding.raceDate);
   const durationMultiplier = HYROX_DURATION_VOLUME_MULTIPLIER[onboarding.sessionDurationMin];
   const level = onboarding.objective === HyroxObjective.PRIMERA_CARRERA ? getHyroxObjective1Level(onboarding) : onboarding.experienceLevel;
@@ -1115,10 +1158,15 @@ export function scaleHyroxTemplateForContext(template: HyroxWorkoutTemplate, con
   }
 
   const combinedConditioningMultiplier = durationMultiplier * rangeMultiplier;
-  return {
-    ...template,
-    blocks: template.blocks.map(b => scaleConditioningBlock(b, combinedConditioningMultiplier))
-  };
+  let blocks = template.blocks.map(b => scaleConditioningBlock(b, combinedConditioningMultiplier));
+
+  if (template.category === "carrera" && vamKmH && vamKmH > 0) {
+    const doseScore = computeHyroxTrainingDoseScore(onboarding.frequency, durationWeeks);
+    const raceOffset = getHyroxRealisticZoneOffsetSecPerKm(onboarding, doseScore);
+    blocks = blocks.map(b => applyHyroxPaceZonesToBlock(b, vamKmH, raceOffset));
+  }
+
+  return { ...template, blocks };
 }
 
 // Punto único de resolución de contenido de sesión: usa la versión de Gemini si ya se generó y

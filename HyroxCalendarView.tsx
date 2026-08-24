@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight, CalendarCheck2, CheckCircle2 } from "lucide-
 interface HyroxCalendarViewProps {
   plan: HyroxTrainingPlan;
   onboarding: HyroxOnboardingData | null;
+  vamKmH?: number;
   completedWorkouts: Record<string, { feedback: string; rpe: number; date: string }>;
 }
 
@@ -20,7 +21,7 @@ const CATEGORY_DOT: Record<HyroxCategory, string> = {
 
 const MONTH_NAMES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
-export default function HyroxCalendarView({ plan, onboarding, completedWorkouts }: HyroxCalendarViewProps) {
+export default function HyroxCalendarView({ plan, onboarding, vamKmH, completedWorkouts }: HyroxCalendarViewProps) {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedDayStr, setSelectedDayStr] = useState<string | null>(new Date().toISOString().split("T")[0]);
 
@@ -76,7 +77,7 @@ export default function HyroxCalendarView({ plan, onboarding, completedWorkouts 
   const selectedSessionInfo = selectedDayStr ? getSessionForDate(new Date(selectedDayStr)) : null;
   const selectedSession = selectedSessionInfo?.session ?? null;
   const selectedTemplate = selectedSessionInfo && onboarding
-    ? resolveHyroxSessionTemplate(selectedSessionInfo.session, { onboarding, weekNumber: selectedSessionInfo.weekNumber, durationWeeks: plan.durationWeeks })
+    ? resolveHyroxSessionTemplate(selectedSessionInfo.session, { onboarding, weekNumber: selectedSessionInfo.weekNumber, durationWeeks: plan.durationWeeks, vamKmH })
     : selectedSession
       ? resolveHyroxSessionTemplate(selectedSession)
       : undefined;

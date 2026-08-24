@@ -11,6 +11,7 @@ import { Calendar, Moon, BrainCircuit, ChevronDown, ChevronUp } from "lucide-rea
 interface HyroxWeeklyPlanViewProps {
   plan: HyroxTrainingPlan;
   onboarding: HyroxOnboardingData | null;
+  vamKmH?: number;
   currentWeekIndex: number;
   onSetCurrentWeek: (idx: number) => void;
   onLogWorkoutCompletion: (sessionId: string, feedback: string, rpe: number) => void;
@@ -32,6 +33,7 @@ const FILTERS: Array<{ val: "all" | HyroxCategory; label: string }> = [
 export default function HyroxWeeklyPlanView({
   plan,
   onboarding,
+  vamKmH,
   currentWeekIndex,
   onSetCurrentWeek,
   onLogWorkoutCompletion,
@@ -175,7 +177,7 @@ export default function HyroxWeeklyPlanView({
           }
 
           const template = onboarding
-            ? resolveHyroxSessionTemplate(session, { onboarding, weekNumber: activeWeek.weekNumber, durationWeeks: plan.durationWeeks })
+            ? resolveHyroxSessionTemplate(session, { onboarding, weekNumber: activeWeek.weekNumber, durationWeeks: plan.durationWeeks, vamKmH })
             : resolveHyroxSessionTemplate(session);
           if (!template) return null;
 

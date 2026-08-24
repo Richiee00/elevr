@@ -12,9 +12,11 @@ import {
   HyroxRaceCategory,
   HyroxSessionDurationMin,
   HyroxStation,
-  HyroxStationLimitingFactor
+  HyroxStationLimitingFactor,
+  HyroxVAMTestResult
 } from "./hyroxTypes";
 import { STATION_LABELS, HYROX_STATIONS_ORDER } from "./hyroxLibrary";
+import { calculateVAMFromTest, VAM_TEST_DURATION_MIN } from "./hyroxEngine";
 import { WheelTimeInput } from "./WheelPicker";
 import {
   ArrowLeft,
@@ -31,12 +33,16 @@ import {
 } from "lucide-react";
 
 interface HyroxOnboardingProps {
-  onComplete: (data: HyroxOnboardingData) => void;
+  // El Test VAM viaja junto a los datos del onboarding cuando el objetivo es "Preparar mi primer
+  // HYROX": es obligatorio en ese flujo (única forma de calcular un tiempo objetivo de carrera real
+  // y ritmos de sesión reales, en vez de la tabla genérica de debutantes). Para el resto de
+  // objetivos sigue siendo opcional y se puede hacer más tarde desde el Dashboard.
+  onComplete: (data: HyroxOnboardingData, vamTest?: HyroxVAMTestResult) => void;
   onCancel: () => void;
   stepOffset?: number;
 }
 
-type StepKey = "objetivo" | "categoria" | "experiencia" | "fecha" | "rendimiento" | "camino" | "gimnasio" | "frecuencia_lesiones" | "perfil";
+type StepKey = "objetivo" | "categoria" | "experiencia" | "fecha" | "rendimiento" | "camino" | "gimnasio" | "frecuencia_lesiones" | "vam" | "perfil";
 
 const CAMINO_OBJECTIVES = [HyroxObjective.MEJORAR_ESTACIONES, HyroxObjective.VOLVER_PAUSA];
 
@@ -47,7 +53,9 @@ function getStepsForObjective(objective: HyroxObjective): StepKey[] {
   if (objective !== HyroxObjective.BASE_GENERAL) steps.push("fecha");
   if (objective === HyroxObjective.MEJORAR_MARCA) steps.push("rendimiento");
   else if (CAMINO_OBJECTIVES.includes(objective)) steps.push("camino");
-  steps.push("gimnasio", "frecuencia_lesiones", "perfil");
+  steps.push("gimnasio", "frecuencia_lesiones");
+  if (objective === HyroxObjective.PRIMERA_CARRERA) steps.push("vam");
+  steps.push("perfil");
   return steps;
 }
 
@@ -60,6 +68,7 @@ const STEP_TITLES: Record<StepKey, string> = {
   camino: "TU SITUACIÓN ACTUAL",
   gimnasio: "TU GIMNASIO",
   frecuencia_lesiones: "FRECUENCIA Y LESIONES",
+  vam: "TEST VAM (OBLIGATORIO)",
   perfil: "PERFIL FISIOLÓGICO"
 };
 
@@ -259,6 +268,9 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
   const [injuryAreas, setInjuryAreas] = useState<string[]>([]);
   const [injuryNotes, setInjuryNotes] = useState("");
 
+  // Test VAM (solo Objetivo 1: "Preparar mi primer HYROX", ver getStepsForObjective).
+  const [vamTestDistance, setVamTestDistance] = useState("");
+
   const [age, setAge] = useState("30");
   const [sex, setSex] = useState<"M" | "F">("M");
   const [height, setHeight] = useState("175");
@@ -279,7 +291,12 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
     setWeakStationsSelfReported(prev => (prev.includes(station) ? prev.filter(s => s !== station) : [...prev, station]));
   };
 
+  const vamMeters = Number(vamTestDistance);
+  const isVamStepValid = vamTestDistance.trim() !== "" && vamMeters > 0;
+
   const handleNext = () => {
+    if (stepKey === "vam" && !isVamStepValid) return;
+
     if (stepIdx < steps.length - 1) {
       setStepIdx(prev => prev + 1);
       return;
@@ -323,7 +340,13 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
       completedAt: new Date().toISOString()
     };
 
-    onComplete(data);
+    if (objective === HyroxObjective.PRIMERA_CARRERA && isVamStepValid) {
+      const { vamKmH, vamPaceMinKm } = calculateVAMFromTest(vamMeters);
+      const vamTest: HyroxVAMTestResult = { distanceMeters: vamMeters, vamKmH, vamPaceMinKm, completedAt: new Date().toISOString() };
+      onComplete(data, vamTest);
+    } else {
+      onComplete(data);
+    }
   };
 
   const handleBack = () => {
@@ -363,6 +386,7 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
     camino: <Compass className="w-5 h-5 text-blue-600" />,
     gimnasio: <Dumbbell className="w-5 h-5 text-blue-600" />,
     frecuencia_lesiones: <ShieldAlert className="w-5 h-5 text-blue-600" />,
+    vam: <Gauge className="w-5 h-5 text-blue-600" />,
     perfil: <User className="w-5 h-5 text-blue-600" />
   };
 
@@ -741,6 +765,40 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
             </div>
           )}
 
+          {stepKey === "vam" && (
+            <div className="space-y-6">
+              <p className="text-xs text-zinc-500 font-medium leading-relaxed">
+                Es la única forma de calcular un tiempo objetivo de carrera real y ritmos de entrenamiento reales,
+                en vez de una tabla genérica para tu categoría. Sin este dato, tu diagnóstico inicial usará un rango
+                más amplio y menos preciso.
+              </p>
+              <div className="bg-white p-5 rounded-2xl border border-zinc-200/80 space-y-4 shadow-sm">
+                <p className="text-xs text-zinc-600 font-medium leading-relaxed">
+                  Corre al máximo esfuerzo que puedas sostener durante{" "}
+                  <span className="font-bold text-zinc-900">{VAM_TEST_DURATION_MIN} minutos</span> (pista, cinta o
+                  exterior llano) y registra la distancia total recorrida. Si nunca has corrido, puedes alternar
+                  carrera y caminata: lo importante es dar tu máximo esfuerzo sostenible.
+                </p>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 block">
+                    Distancia recorrida (metros)
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={vamTestDistance}
+                    onChange={e => setVamTestDistance(cleanNumericInput(e.target.value))}
+                    placeholder="Ej. 1150"
+                    className="w-full bg-white border border-zinc-200/80 rounded-xl px-4 py-3 text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold font-mono"
+                  />
+                </div>
+                <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">
+                  Podrás repetir este test más adelante desde el Dashboard para mantener tus tiempos y ritmos siempre actualizados.
+                </p>
+              </div>
+            </div>
+          )}
+
           {stepKey === "perfil" && (
             <div className="space-y-6">
               <p className="text-xs text-zinc-500 font-medium leading-relaxed">
@@ -811,7 +869,12 @@ export default function HyroxOnboarding({ onComplete, onCancel, stepOffset = 0 }
 
         <button
           onClick={handleNext}
-          className="px-6 py-3 rounded-xl bg-black hover:bg-zinc-800 text-white font-extrabold uppercase tracking-widest text-xs transition flex items-center gap-1.5 cursor-pointer shadow-md"
+          disabled={stepKey === "vam" && !isVamStepValid}
+          className={`px-6 py-3 rounded-xl font-extrabold uppercase tracking-widest text-xs transition flex items-center gap-1.5 shadow-md ${
+            stepKey === "vam" && !isVamStepValid
+              ? "bg-zinc-200 text-zinc-400 cursor-not-allowed"
+              : "bg-black hover:bg-zinc-800 text-white cursor-pointer"
+          }`}
         >
           {stepIdx === steps.length - 1 ? "Generar Plan" : "Continuar"}
           <ArrowRight className="w-4 h-4" />

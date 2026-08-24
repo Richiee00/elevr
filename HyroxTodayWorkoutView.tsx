@@ -10,6 +10,7 @@ import { Moon, Flame, BrainCircuit, ChevronDown, ChevronUp, ArrowLeft, ArrowRigh
 interface HyroxTodayWorkoutViewProps {
   plan: HyroxTrainingPlan;
   onboarding: HyroxOnboardingData | null;
+  vamKmH?: number;
   currentWeekIndex: number;
   readiness?: HyroxDailyInput;
   onSaveReadiness: (input: HyroxDailyInput) => void;
@@ -22,6 +23,7 @@ const DAY_NAMES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábad
 export default function HyroxTodayWorkoutView({
   plan,
   onboarding,
+  vamKmH,
   currentWeekIndex,
   readiness,
   onSaveReadiness,
@@ -77,7 +79,7 @@ export default function HyroxTodayWorkoutView({
   }, [viewedSession.id]);
 
   const template = onboarding
-    ? resolveHyroxSessionTemplate(viewedSession, { onboarding, weekNumber: activeWeek.weekNumber, durationWeeks: plan.durationWeeks })
+    ? resolveHyroxSessionTemplate(viewedSession, { onboarding, weekNumber: activeWeek.weekNumber, durationWeeks: plan.durationWeeks, vamKmH })
     : resolveHyroxSessionTemplate(viewedSession);
   // generatedVersion se referencia únicamente para forzar el re-render cuando Gemini termina de generar.
   void generatedVersion;

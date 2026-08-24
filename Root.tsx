@@ -8,7 +8,7 @@ import Onboarding from "./Onboarding";
 import HyroxOnboarding from "./HyroxOnboarding";
 import { OnboardingData, RunningVAMTestResult } from "./types";
 import { generateTrainingPlan } from "./engines";
-import { HyroxOnboardingData } from "./hyroxTypes";
+import { HyroxOnboardingData, HyroxVAMTestResult } from "./hyroxTypes";
 import { generateHyroxPlan } from "./hyroxEngine";
 
 type Stage =
@@ -44,12 +44,13 @@ export default function Root() {
     setStage("app-running");
   };
 
-  const handleCompleteHyrox = (data: HyroxOnboardingData) => {
-    const plan = generateHyroxPlan(data);
+  const handleCompleteHyrox = (data: HyroxOnboardingData, vamTest?: HyroxVAMTestResult) => {
+    const plan = generateHyroxPlan(data, vamTest?.vamKmH);
     localStorage.setItem("hyrox_plan_onboarding", JSON.stringify(data));
     localStorage.setItem("hyrox_plan_data", JSON.stringify(plan));
     localStorage.setItem("hyrox_plan_current_week", "0");
     localStorage.setItem("elevr_active_app", "hyrox");
+    if (vamTest) localStorage.setItem("hyrox_plan_vam_test", JSON.stringify(vamTest));
     setStage("app-hyrox");
   };
 

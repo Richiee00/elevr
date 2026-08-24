@@ -242,7 +242,8 @@ export default function HyroxDashboard({ plan, activeInjury, injuryAreas, comple
 
                 {!vamTest && (
                   <p className="text-[11px] text-zinc-400 font-medium leading-relaxed mt-4">
-                    Completa el Test VAM en cualquier momento para desbloquear además tus zonas de ritmo reales en el Perfil.
+                    Este rango es una estimación genérica para tu categoría, sin datos de tu rendimiento actual.
+                    Completa el Test VAM en cualquier momento para recalcularlo con tu ritmo real (y desbloquear tus zonas de ritmo en el Perfil).
                   </p>
                 )}
               </>

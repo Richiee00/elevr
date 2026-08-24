@@ -51,7 +51,9 @@ export default function HyroxApp({ onSwitchDiscipline, onResetToLanding }: Hyrox
   };
 
   const handleUpdateProfile = (data: HyroxOnboardingData) => {
-    const newPlan = generateHyroxPlan(data);
+    // Si ya existe un Test VAM, lo reutilizamos: editar el perfil no debe hacer que el plan vuelva a
+    // la tabla genérica de debutantes.
+    const newPlan = generateHyroxPlan(data, vamTest?.vamKmH);
     setOnboarding(data);
     setPlan(newPlan);
     localStorage.setItem("hyrox_plan_onboarding", JSON.stringify(data));
@@ -178,6 +180,7 @@ export default function HyroxApp({ onSwitchDiscipline, onResetToLanding }: Hyrox
               <HyroxTodayWorkoutView
                 plan={plan}
                 onboarding={onboarding}
+                vamKmH={vamTest?.vamKmH}
                 currentWeekIndex={currentWeekIndex}
                 readiness={todayReadiness}
                 onSaveReadiness={handleSaveReadiness}
@@ -192,6 +195,7 @@ export default function HyroxApp({ onSwitchDiscipline, onResetToLanding }: Hyrox
               <HyroxWeeklyPlanView
                 plan={plan}
                 onboarding={onboarding}
+                vamKmH={vamTest?.vamKmH}
                 currentWeekIndex={currentWeekIndex}
                 onSetCurrentWeek={handleSetCurrentWeekIndex}
                 onLogWorkoutCompletion={handleLogWorkoutCompletion}
@@ -204,7 +208,7 @@ export default function HyroxApp({ onSwitchDiscipline, onResetToLanding }: Hyrox
 
           {activeTab === "calendar" && plan && (
             <motion.div key="calendar" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-              <HyroxCalendarView plan={plan} onboarding={onboarding} completedWorkouts={completedWorkouts} />
+              <HyroxCalendarView plan={plan} onboarding={onboarding} vamKmH={vamTest?.vamKmH} completedWorkouts={completedWorkouts} />
             </motion.div>
           )}
 
