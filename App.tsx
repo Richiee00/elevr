@@ -29,6 +29,9 @@ import {
 interface AppProps {
   onSwitchDiscipline?: () => void;
   onResetToLanding: () => void;
+  // "dashboard" justo al terminar el onboarding (para ver el diagnóstico inicial primero);
+  // "today" en cualquier otra entrada (usuario que vuelve a un plan ya existente).
+  initialTab?: "dashboard" | "today";
 }
 
 function loadJSON<T>(key: string, fallback: T): T {
@@ -41,11 +44,11 @@ function loadJSON<T>(key: string, fallback: T): T {
   }
 }
 
-export default function App({ onSwitchDiscipline, onResetToLanding }: AppProps) {
+export default function App({ onSwitchDiscipline, onResetToLanding, initialTab = "today" }: AppProps) {
   // Root.tsx solo monta App cuando ya existe un plan de running guardado, así que este componente
   // no necesita sus propias pantallas de landing/onboarding: se inicializa directamente con los
   // datos persistidos (lazy init, sin useEffect posterior) para no mostrar ningún flash intermedio.
-  const [activeTab, setActiveTab] = useState<"dashboard" | "today" | "plan" | "profile" | "calendar">("today");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "today" | "plan" | "profile" | "calendar">(initialTab);
 
   const [onboarding, setOnboarding] = useState<OnboardingData | null>(() => loadJSON("run_plan_onboarding", null));
   const [plan, setPlan] = useState<TrainingPlan | null>(() => loadJSON("run_plan_data", null));

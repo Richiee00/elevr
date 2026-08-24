@@ -102,6 +102,17 @@ function parseExerciseDetails(exercise: string): { name: string; details: string
   return { name: exercise.trim(), details: "" };
 }
 
+// Separa "3x10" / "3x10 por lado" / "3x40s" en el número de series (rounds) y el resto de la
+// prescripción (reps). Ambos ejercicios de una biserie comparten el mismo número de series: se toma
+// el primero que aparezca en el bloque.
+function splitRoundsAndReps(details: string): { rounds: string | null; reps: string } {
+  const match = details.match(/^(\d+)\s*[x×*]\s*(.+)$/i);
+  if (match) {
+    return { rounds: match[1], reps: match[2].trim() };
+  }
+  return { rounds: null, reps: details };
+}
+
 interface WeeklyPlanViewProps {
   plan: TrainingPlan;
   currentWeekIndex: number;
@@ -488,6 +499,10 @@ export default function WeeklyPlanView({
             blockTitle?: string;
             originalIndex?: number;
             totalInPhase?: number;
+            // Solo para mainWork: la biserie completa del bloque, para mostrar todos sus ejercicios
+            // juntos en el mismo paso en vez de partirlos uno por pantalla.
+            exercises?: Array<{ name: string; reps: string }>;
+            rounds?: string | null;
           }> = [];
 
           if (workoutToExecute) {
@@ -513,28 +528,26 @@ export default function WeeklyPlanView({
             }
 
             if (workoutToExecute.mainWork) {
+              // Un paso por BLOQUE (biserie), no por ejercicio — así se ve que los ejercicios de un
+              // mismo bloque van seguidos y juntos forman una sola serie a repetir.
               const mainBlocks = parseMainWork(workoutToExecute.mainWork);
-              const mainWorkExercises: Array<{ name: string; details: string; blockTitle: string }> = [];
-              mainBlocks.forEach(block => {
-                block.exercises.forEach(ex => {
-                  const parsed = parseExerciseDetails(ex);
-                  mainWorkExercises.push({
-                    name: parsed.name,
-                    details: parsed.details,
-                    blockTitle: block.title
-                  });
-                });
-              });
 
-              mainWorkExercises.forEach((ex, idx) => {
+              mainBlocks.forEach((block, idx) => {
+                const parsedExercises = block.exercises.map(ex => {
+                  const { name, details } = parseExerciseDetails(ex);
+                  return { name, ...splitRoundsAndReps(details) };
+                });
+                const rounds = parsedExercises.find(e => e.rounds)?.rounds ?? null;
+
                 executionSteps.push({
                   type: "mainWork",
-                  title: `Trabajo Principal (${idx + 1}/${mainWorkExercises.length})`,
-                  name: ex.name,
-                  details: ex.details,
-                  blockTitle: ex.blockTitle,
+                  title: `Trabajo Principal (${idx + 1}/${mainBlocks.length})`,
+                  name: block.title || `Bloque ${idx + 1}`,
+                  blockTitle: block.title,
+                  exercises: parsedExercises.map(e => ({ name: e.name, reps: e.reps })),
+                  rounds,
                   originalIndex: idx,
-                  totalInPhase: mainWorkExercises.length
+                  totalInPhase: mainBlocks.length
                 });
               });
             }
@@ -1137,30 +1150,78 @@ export default function WeeklyPlanView({
                                 </span>
                               </div>
 
-                              {/* Main Name / Instruction */}
-                              <h3 className="text-xl sm:text-2xl font-black text-zinc-900 uppercase tracking-tight leading-snug max-w-2xl mx-auto">
-                                {activeExecStep.name}
-                              </h3>
+                              {activeExecStep.type === "mainWork" && activeExecStep.exercises && activeExecStep.exercises.length > 0 ? (
+                                // Bloque completo (biserie): todos sus ejercicios se muestran juntos,
+                                // en el orden en que hay que hacerlos, con las series a repetir.
+                                <div className="space-y-4">
+                                  {activeExecStep.rounds && (
+                                    <div className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider">
+                                      {activeExecStep.rounds} Series
+                                    </div>
+                                  )}
+                                  <h3 className="text-lg sm:text-xl font-black text-zinc-900 uppercase tracking-tight leading-snug max-w-2xl mx-auto">
+                                    {activeExecStep.name}
+                                  </h3>
+                                  <div className="max-w-md mx-auto space-y-2 text-left">
+                                    {activeExecStep.exercises.map((ex, exIdx) => (
+                                      <React.Fragment key={exIdx}>
+                                        <div className="flex items-center gap-3 bg-zinc-50 border border-zinc-200/80 rounded-xl px-4 py-3">
+                                          <span className="shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-black flex items-center justify-center">
+                                            {exIdx + 1}
+                                          </span>
+                                          <div className="min-w-0">
+                                            <p className="text-sm font-bold text-zinc-900 truncate">{ex.name}</p>
+                                            {ex.reps && (
+                                              <p className="text-xs font-mono font-bold text-blue-600">{ex.reps}</p>
+                                            )}
+                                          </div>
+                                        </div>
+                                        {activeExecStep.exercises && exIdx < activeExecStep.exercises.length - 1 && (
+                                          <div className="flex items-center justify-center gap-1 text-[9px] font-bold uppercase tracking-wider text-zinc-400 py-0.5">
+                                            ↓ luego, sin descanso
+                                          </div>
+                                        )}
+                                      </React.Fragment>
+                                    ))}
+                                  </div>
+                                  {activeExecStep.exercises.length > 1 && (
+                                    <p className="text-[11px] text-zinc-500 font-medium leading-relaxed max-w-md mx-auto">
+                                      Haz estos {activeExecStep.exercises.length} ejercicios seguidos, en este orden: eso es{" "}
+                                      <strong className="text-zinc-900">1 serie</strong>.{" "}
+                                      {activeExecStep.rounds
+                                        ? `Repite el bloque completo ${activeExecStep.rounds} veces`
+                                        : "Repite el bloque completo"}, descansando entre series.
+                                    </p>
+                                  )}
+                                </div>
+                              ) : (
+                                <>
+                                  {/* Main Name / Instruction */}
+                                  <h3 className="text-xl sm:text-2xl font-black text-zinc-900 uppercase tracking-tight leading-snug max-w-2xl mx-auto">
+                                    {activeExecStep.name}
+                                  </h3>
 
-                              {/* Details */}
-                              {activeExecStep.details ? (
-                                <div className="inline-flex flex-col items-center justify-center bg-zinc-50 border border-zinc-200/80 px-6 py-4 rounded-2xl mt-2">
-                                  <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-wider mb-1 font-sans">
-                                    Prescripción / Repeticiones
-                                  </span>
-                                  <span className="text-2xl sm:text-3xl font-black text-blue-600 font-mono tracking-wider">
-                                    {activeExecStep.details}
-                                  </span>
-                                </div>
-                              ) : activeExecStep.type === "mainWork" && (
-                                <div className="inline-flex flex-col items-center justify-center bg-zinc-50 border border-zinc-200/80 px-5 py-3 rounded-2xl mt-2">
-                                  <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-wider mb-1 font-sans">
-                                    Intensidad del Bloque
-                                  </span>
-                                  <span className="text-xs font-bold text-zinc-900 uppercase tracking-wider font-mono">
-                                    {workoutToExecute.intensity || "Sostener esfuerzo"}
-                                  </span>
-                                </div>
+                                  {/* Details */}
+                                  {activeExecStep.details ? (
+                                    <div className="inline-flex flex-col items-center justify-center bg-zinc-50 border border-zinc-200/80 px-6 py-4 rounded-2xl mt-2">
+                                      <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-wider mb-1 font-sans">
+                                        Prescripción / Repeticiones
+                                      </span>
+                                      <span className="text-2xl sm:text-3xl font-black text-blue-600 font-mono tracking-wider">
+                                        {activeExecStep.details}
+                                      </span>
+                                    </div>
+                                  ) : activeExecStep.type === "mainWork" && (
+                                    <div className="inline-flex flex-col items-center justify-center bg-zinc-50 border border-zinc-200/80 px-5 py-3 rounded-2xl mt-2">
+                                      <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-wider mb-1 font-sans">
+                                        Intensidad del Bloque
+                                      </span>
+                                      <span className="text-xs font-bold text-zinc-900 uppercase tracking-wider font-mono">
+                                        {workoutToExecute.intensity || "Sostener esfuerzo"}
+                                      </span>
+                                    </div>
+                                  )}
+                                </>
                               )}
 
                               {activeCompletedSteps[currentExecIdx] && (

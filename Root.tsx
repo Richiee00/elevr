@@ -28,6 +28,9 @@ export default function Root() {
   // Recuerda desde qué disciplina se abrió el selector cuando se usa como "cambiar de disciplina"
   // en vez de como el primer paso del onboarding, para poder volver directamente a ella con "Atrás".
   const [switchOrigin, setSwitchOrigin] = useState<Stage | null>(null);
+  // Justo al terminar el onboarding, la app debe abrir en Diagnóstico (para ver el análisis inicial
+  // antes que el entreno de hoy). Cualquier otra entrada a un plan ya existente sigue abriendo en Hoy.
+  const [runningInitialTab, setRunningInitialTab] = useState<"dashboard" | "today">("today");
 
   const handleCompleteRunning = (data: OnboardingData, vamTest: RunningVAMTestResult) => {
     const plan = generateTrainingPlan(data, vamTest.vamKmH);
@@ -37,6 +40,7 @@ export default function Root() {
     localStorage.setItem("run_plan_vam_test", JSON.stringify(vamTest));
     localStorage.setItem("run_plan_vam_history", JSON.stringify([vamTest]));
     localStorage.setItem("elevr_active_app", "running");
+    setRunningInitialTab("dashboard");
     setStage("app-running");
   };
 
@@ -54,6 +58,7 @@ export default function Root() {
     if (discipline === "running") {
       if (localStorage.getItem("run_plan_data")) {
         localStorage.setItem("elevr_active_app", "running");
+        setRunningInitialTab("today");
         setStage("app-running");
       } else {
         setStage("onboarding-running");
@@ -79,7 +84,7 @@ export default function Root() {
     setStage("landing");
   };
 
-  if (stage === "app-running") return <App onSwitchDiscipline={handleSwitchDiscipline} onResetToLanding={handleResetToLanding} />;
+  if (stage === "app-running") return <App onSwitchDiscipline={handleSwitchDiscipline} onResetToLanding={handleResetToLanding} initialTab={runningInitialTab} />;
   if (stage === "app-hyrox") return <HyroxApp onSwitchDiscipline={handleSwitchDiscipline} onResetToLanding={handleResetToLanding} />;
 
   const hasAnyPlan = !!localStorage.getItem("run_plan_data") || !!localStorage.getItem("hyrox_plan_data");
@@ -98,6 +103,7 @@ export default function Root() {
                   if (activeApp === "hyrox" || (!activeApp && localStorage.getItem("hyrox_plan_data"))) {
                     setStage("app-hyrox");
                   } else {
+                    setRunningInitialTab("today");
                     setStage("app-running");
                   }
                 }}
