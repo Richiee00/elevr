@@ -2,25 +2,29 @@ import React, { useState } from "react";
 import { HyroxTrainingPlan, HyroxObjective, HyroxVAMTestResult } from "./hyroxTypes";
 import { STATION_LABELS, PARCIAL_LABELS } from "./hyroxLibrary";
 import HyroxVAMTestCard from "./HyroxVAMTestCard";
+import { hasHyroxEarlyEngagement } from "./hyroxEngine";
 import { Activity, TrendingUp, Award, ShieldAlert, Zap, Calendar, Layers, Target, Flag, Gauge } from "lucide-react";
-
-const IMC_UNLOCK_WORKOUTS = 10;
 
 interface HyroxDashboardProps {
   plan: HyroxTrainingPlan;
   activeInjury: boolean;
   injuryAreas: string[];
-  completedWorkoutsCount: number;
+  completedWorkouts: Record<string, { feedback: string; rpe: number; date: string }>;
   vamTest: HyroxVAMTestResult | null;
   onSaveVAMTest: (result: HyroxVAMTestResult) => void;
 }
 
-export default function HyroxDashboard({ plan, activeInjury, injuryAreas, completedWorkoutsCount, vamTest, onSaveVAMTest }: HyroxDashboardProps) {
+export default function HyroxDashboard({ plan, activeInjury, injuryAreas, completedWorkouts, vamTest, onSaveVAMTest }: HyroxDashboardProps) {
   const { initialDiagnostic } = plan;
   const [showVamTest, setShowVamTest] = useState(false);
 
+  // Por credibilidad, el IMC y el tiempo objetivo de carrera no se muestran de primeras aunque ya
+  // estén calculados: solo una vez que el usuario ha demostrado cómo responde a sus primeros
+  // entrenamientos (60% de los entrenamientos de las 2 primeras semanas).
+  const earlyEngagement = hasHyroxEarlyEngagement(plan, completedWorkouts);
+
   const renderBMIWidget = (bmi: number, category: string) => {
-    if (completedWorkoutsCount < IMC_UNLOCK_WORKOUTS) {
+    if (!earlyEngagement) {
       return (
         <div className="bg-white rounded-2xl p-6 border border-zinc-200/80 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
@@ -28,10 +32,10 @@ export default function HyroxDashboard({ plan, activeInjury, injuryAreas, comple
             <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-900">Composición Corporal (IMC)</h4>
           </div>
           <div className="py-5 text-center">
-            <p className="text-2xl font-black text-zinc-400 italic">Analizando…</p>
+            <p className="text-2xl font-black text-zinc-400 italic">Calculando…</p>
           </div>
           <p className="text-xs text-zinc-500 font-medium leading-relaxed">
-            Disponible al completar {IMC_UNLOCK_WORKOUTS} entrenamientos ({completedWorkoutsCount}/{IMC_UNLOCK_WORKOUTS} completados).
+            Para poder darte información veraz debemos ver cómo respondes a los primeros entrenamientos.
           </p>
         </div>
       );
@@ -209,6 +213,15 @@ export default function HyroxDashboard({ plan, activeInjury, injuryAreas, comple
                   />
                 )}
               </>
+            ) : !earlyEngagement ? (
+              <>
+                <div className="py-5 text-center">
+                  <p className="text-2xl font-black text-zinc-400 italic">Calculando…</p>
+                </div>
+                <p className="text-xs text-zinc-500 font-medium leading-relaxed">
+                  Para poder darte información veraz debemos ver cómo respondes a los primeros entrenamientos.
+                </p>
+              </>
             ) : (
               <>
                 <p className="text-xs text-zinc-500 font-medium leading-relaxed mb-5">
@@ -232,19 +245,31 @@ export default function HyroxDashboard({ plan, activeInjury, injuryAreas, comple
                   </div>
                 </div>
 
-                {initialDiagnostic.expectedImprovement && (
-                  <p className="text-[11px] text-zinc-500 font-medium leading-relaxed mt-4">
-                    Mejora esperable con tu frecuencia semanal: {initialDiagnostic.expectedImprovement.pct8Weeks[0]}-{initialDiagnostic.expectedImprovement.pct8Weeks[1]}%
-                    en 8 semanas, {initialDiagnostic.expectedImprovement.pct12Weeks[0]}-{initialDiagnostic.expectedImprovement.pct12Weeks[1]}% en 12 semanas. Es una
-                    expectativa orientativa, no una promesa.
+                {!vamTest && (
+                  <p className="text-[11px] text-zinc-400 font-medium leading-relaxed mt-4">
+                    Completa el Test VAM en cualquier momento para desbloquear además tus zonas de ritmo reales en el Perfil.
                   </p>
                 )}
 
-                {!vamTest && (
-                  <p className="text-[11px] text-zinc-400 font-medium leading-relaxed mt-4">
-                    Este rango es una estimación genérica para tu categoría, sin datos de tu rendimiento actual.
-                    Completa el Test VAM en cualquier momento para recalcularlo con tu ritmo real (y desbloquear tus zonas de ritmo en el Perfil).
-                  </p>
+                {!showVamTest ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowVamTest(true)}
+                    className="w-full mt-4 py-2.5 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-600 font-bold uppercase tracking-wider text-[11px] cursor-pointer transition flex items-center justify-center gap-1.5"
+                  >
+                    <Gauge className="w-3.5 h-3.5" />
+                    Repetir Test VAM
+                  </button>
+                ) : (
+                  <div className="mt-4">
+                    <HyroxVAMTestCard
+                      onComplete={result => {
+                        onSaveVAMTest(result);
+                        setShowVamTest(false);
+                      }}
+                      onCancel={() => setShowVamTest(false)}
+                    />
+                  </div>
                 )}
               </>
             )}

@@ -4,10 +4,8 @@ import {
   RunningObjective,
   ExperienceLevel,
   FrequencyOption,
-  OnboardingData,
-  RunningVAMTestResult
+  OnboardingData
 } from "./types";
-import { calculateVAMFromTest, RUNNING_VAM_TEST_DURATION_MIN } from "./engines";
 import {
   ArrowLeft,
   ArrowRight,
@@ -18,14 +16,11 @@ import {
   ShieldAlert,
   Flame,
   Heart,
-  Activity,
-  Gauge
+  Activity
 } from "lucide-react";
 
 interface OnboardingProps {
-  // El Test VAM es obligatorio: no se puede generar el plan sin él (única fuente de los ritmos de
-  // entrenamiento), por eso viaja siempre junto a los datos del onboarding.
-  onComplete: (data: OnboardingData, vamTest: RunningVAMTestResult) => void;
+  onComplete: (data: OnboardingData) => void;
   onCancel: () => void;
   stepOffset?: number;
 }
@@ -52,7 +47,6 @@ export default function Onboarding({ onComplete, onCancel, stepOffset = 0 }: Onb
   const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>(ExperienceLevel.INTERMEDIO_2K);
   const [time10K, setTime10K] = useState<string>("50:00");
   const [time21K, setTime21K] = useState<string>("01:55:00");
-  const [vamTestDistance, setVamTestDistance] = useState<string>("");
   const [maxDistanceCurrent, setMaxDistanceCurrent] = useState<"less_5" | "5_10" | "10_15" | "more_15">("5_10");
   const [resistanceTarget, setResistanceTarget] = useState<"run_10k" | "run_15k" | "run_21k" | "general">("run_10k");
 
@@ -84,13 +78,8 @@ export default function Onboarding({ onComplete, onCancel, stepOffset = 0 }: Onb
     return Number.isFinite(n) && n > 0 ? n : fallback;
   };
 
-  const vamMeters = Number(vamTestDistance);
-  const isVamStepValid = vamTestDistance.trim() !== "" && vamMeters > 0;
-
   const handleNext = () => {
-    if (step === 4 && !isVamStepValid) return;
-
-    if (step < 5) {
+    if (step < 4) {
       setStep(prev => prev + 1);
     } else {
       const parsedAge = getSafeNumber(age, 30);
@@ -126,9 +115,7 @@ export default function Onboarding({ onComplete, onCancel, stepOffset = 0 }: Onb
         data.resistanceTarget = resistanceTarget;
       }
 
-      const { vamKmH, vamPaceMinKm } = calculateVAMFromTest(vamMeters);
-      const vamTest: RunningVAMTestResult = { distanceMeters: vamMeters, vamKmH, vamPaceMinKm, completedAt: new Date().toISOString() };
-      onComplete(data, vamTest);
+      onComplete(data);
     }
   };
 
@@ -381,6 +368,10 @@ export default function Onboarding({ onComplete, onCancel, stepOffset = 0 }: Onb
                 </div>
               )}
 
+              {/* El Test VAM ya no se pide en el onboarding para ningún objetivo: se realiza más
+                  adelante en Diagnóstico, ya con el plan generado (igual que en Hyrox), y es
+                  obligatorio completarlo antes de poder empezar a entrenar. Así se evita basar
+                  cualquier cálculo en un tiempo introducido que puede estar desactualizado. */}
             </div>
           </motion.div>
         )}
@@ -542,56 +533,8 @@ export default function Onboarding({ onComplete, onCancel, stepOffset = 0 }: Onb
           >
             <div>
               <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
-                <Gauge className="w-5 h-5 text-blue-600" />
-                {stepLabel(4)}. TEST VAM (OBLIGATORIO)
-              </h3>
-              <p className="text-xs uppercase tracking-wider text-zinc-500 font-bold">
-                Es la única forma de calcular tus ritmos de entrenamiento reales. Un tiempo de carrera antiguo puede
-                estar desactualizado; el Test VAM refleja tu nivel actual, hoy.
-              </p>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-zinc-200/80 space-y-4 shadow-sm">
-              <p className="text-xs text-zinc-600 font-medium leading-relaxed">
-                Corre al máximo esfuerzo que puedas sostener durante{" "}
-                <span className="font-bold text-zinc-900">{RUNNING_VAM_TEST_DURATION_MIN} minutos</span> (pista, cinta
-                o exterior llano) y registra la distancia total recorrida. Si nunca has corrido, puedes alternar
-                carrera y caminata: lo importante es dar tu máximo esfuerzo sostenible.
-              </p>
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 block">
-                  Distancia recorrida (metros)
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={vamTestDistance}
-                  onChange={(e) => setVamTestDistance(cleanNumericInput(e.target.value))}
-                  placeholder="Ej. 1150"
-                  className="w-full bg-white border border-zinc-200/80 rounded-xl px-4 py-3 text-zinc-900 focus:outline-none focus:border-blue-600 transition font-bold font-mono"
-                />
-              </div>
-              <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">
-                Este test se repetirá cada 4 semanas (en tus semanas de descarga) para mantener tus ritmos siempre
-                actualizados y mostrarte tu mejora real.
-              </p>
-            </div>
-          </motion.div>
-        )}
-
-        {step === 5 && (
-          <motion.div
-            key="step5"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.3 }}
-            className="space-y-6"
-          >
-            <div>
-              <h3 className="text-xl font-black italic uppercase tracking-tight text-zinc-900 flex items-center gap-2 mb-2">
                 <User className="w-5 h-5 text-blue-600" />
-                {stepLabel(5)}. PERFIL FISIOLÓGICO
+                {stepLabel(4)}. PERFIL FISIOLÓGICO
               </h3>
               <p className="text-xs uppercase tracking-wider text-zinc-500 font-bold">
                 Conocer tu perfil nos permite adaptarlo a tu estado físico, nivel de energía, recuperación y progreso diario.
@@ -678,14 +621,9 @@ export default function Onboarding({ onComplete, onCancel, stepOffset = 0 }: Onb
 
         <button
           onClick={handleNext}
-          disabled={step === 4 && !isVamStepValid}
-          className={`px-6 py-3 rounded-xl font-extrabold uppercase tracking-widest text-xs transition flex items-center gap-1.5 shadow-md ${
-            step === 4 && !isVamStepValid
-              ? "bg-zinc-200 text-zinc-400 cursor-not-allowed"
-              : "bg-black hover:bg-zinc-800 text-white cursor-pointer"
-          }`}
+          className="px-6 py-3 rounded-xl bg-black hover:bg-zinc-800 text-white font-extrabold uppercase tracking-widest text-xs transition flex items-center gap-1.5 cursor-pointer shadow-md"
         >
-          {step === 5 ? "Generar Plan" : "Continuar"}
+          {step === 4 ? "Generar Plan" : "Continuar"}
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>

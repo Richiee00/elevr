@@ -2,14 +2,11 @@ import {
   HyroxBlock,
   HyroxDivision,
   HyroxExperienceLevel,
-  HyroxExercise,
   HyroxFrequencyOption,
   HyroxLimitantType,
   HyroxObjective,
   HyroxOnboardingData,
-  HyroxOfficialLoadRow,
   HyroxPerformanceData,
-  HyroxPhase,
   HyroxRaceCategory,
   HyroxStation,
   HyroxTrainingPlan,
@@ -19,19 +16,7 @@ import {
   HyroxBenchmarkBand
 } from "./hyroxTypes";
 import { HYROX_WORKOUT_LIBRARY, getTemplateById } from "./hyroxLibrary";
-import {
-  HYROX_BENCHMARKS,
-  HYROX_DEBUTANTE_RANGE,
-  HYROX_OFFICIAL_LOADS,
-  HYROX_LOAD_PHASE_PCT,
-  HYROX_DURATION_VOLUME_MULTIPLIER,
-  HYROX_DURATION_STRENGTH_SERIES,
-  HYROX_DURATION_TOPSET_ADJUST_PP,
-  HYROX_LEVEL_RULES,
-  HYROX_DIVISION_BIAS,
-  HYROX_IMPROVEMENT_RANGES,
-  getHyroxImprovementFrequencyBucket
-} from "./hyroxBenchmarks";
+import { HYROX_BENCHMARKS, HYROX_DEBUTANTE_RANGE } from "./hyroxBenchmarks";
 import { calculateBMI, parseTimeToSeconds, formatSecondsToTime } from "./engines";
 
 export { calculateBMI };
@@ -200,6 +185,23 @@ export function classifyAdherence(completed: number, planned: number): { pct: nu
 // ============================================================================
 
 export const VAM_TEST_DURATION_MIN = 6;
+
+// Mismo umbral de "compromiso temprano" que Running: el IMC y el tiempo objetivo de carrera no se
+// muestran de primeras, solo una vez que el usuario ha demostrado cómo responde a sus primeros
+// entrenamientos (60% de los entrenamientos de las 2 primeras semanas, sin contar descansos).
+export const EARLY_ENGAGEMENT_THRESHOLD = 0.6;
+export const EARLY_ENGAGEMENT_WEEKS = 2;
+
+export function hasHyroxEarlyEngagement(
+  plan: HyroxTrainingPlan,
+  completedWorkouts: Record<string, { feedback: string; rpe: number; date: string }>
+): boolean {
+  const firstWeeks = plan.weeks.slice(0, EARLY_ENGAGEMENT_WEEKS);
+  const activeSessions = firstWeeks.flatMap(w => w.sessions.filter(s => s.category !== "descanso"));
+  if (activeSessions.length === 0) return false;
+  const completedCount = activeSessions.filter(s => !!completedWorkouts[s.id]).length;
+  return completedCount / activeSessions.length >= EARLY_ENGAGEMENT_THRESHOLD;
+}
 
 function formatPaceMinKm(paceMinPerKm: number): string {
   if (!Number.isFinite(paceMinPerKm) || paceMinPerKm <= 0) return "--:--";
@@ -423,143 +425,17 @@ const HYROX_RACE_FATIGUE_FACTORS = [0.98, 1.0, 1.01, 1.02, 1.03, 1.04, 1.05, 1.0
 
 // Ritmo umbral estimado a partir del Test VAM: el cerebro lista "Test VAM" como método válido
 // para calcular el ritmo umbral (misma convención que el módulo de running: ~85% de la velocidad VAM).
-function getHyroxThresholdPaceSecPerKm(vamKmH: number): number {
-  return 3600 / vamKmH / 0.85;
-}
-
 function estimateHyroxRunningSecondsFromVAM(vamKmH: number, zoneOffsetSecPerKm: number): number {
   if (vamKmH <= 0) return 0;
-  const thresholdPaceSecPerKm = getHyroxThresholdPaceSecPerKm(vamKmH);
+  const thresholdPaceSecPerKm = 3600 / vamKmH / 0.85;
   const zonePaceSecPerKm = Math.max(120, thresholdPaceSecPerKm + zoneOffsetSecPerKm);
   return HYROX_RACE_FATIGUE_FACTORS.reduce((sum, f) => sum + zonePaceSecPerKm * f, 0);
 }
 
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
-
-const HYROX_EXPERIENCE_RANK: Record<HyroxExperienceLevel, number> = {
-  [HyroxExperienceLevel.PRINCIPIANTE]: 0,
-  [HyroxExperienceLevel.INTERMEDIO]: 1,
-  [HyroxExperienceLevel.AVANZADO]: 2
-};
-
-// Cerebro v3, Objetivo 1, bloque C: nivel resultante = el mayor entre experiencia en running y en
-// fuerza. Nunca se usa experienceLevel (experiencia en Hyrox), que en este objetivo siempre es
-// "ninguna" por definición (el usuario nunca ha competido).
-export function getHyroxObjective1Level(data: HyroxOnboardingData): HyroxExperienceLevel {
-  return HYROX_EXPERIENCE_RANK[data.runningExperience] >= HYROX_EXPERIENCE_RANK[data.strengthExperience]
-    ? data.runningExperience
-    : data.strengthExperience;
-}
-
-// Cerebro v3, Objetivo 1, bloque E, paso 3: dosis de entrenamiento (frecuencia semanal x semanas de
-// preparación). La frecuencia pesa más (0.6) que las semanas totales (0.4).
-export function computeHyroxTrainingDoseScore(frequency: HyroxFrequencyOption, durationWeeks: number): number {
-  const sessionsPerWeek = Number(frequency);
-  const freqScore = Math.min(1, sessionsPerWeek / 6);
-  const weeksScore = Math.min(1, Math.min(durationWeeks, 16) / 16);
-  return Math.min(1, Math.max(0, freqScore * 0.6 + weeksScore * 0.4));
-}
-
-// Cerebro v3, Objetivo 1, bloque A/D: fase del plan. Independiente de isDescarga (una descarga puede
-// caer dentro de cualquier fase).
-export function computeHyroxPhase(weekNumber: number, durationWeeks: number, hasRaceDate: boolean): HyroxPhase {
-  if (hasRaceDate && weekNumber >= durationWeeks) return "carrera";
-  const pct = weekNumber / Math.max(1, durationWeeks);
-  if (pct <= 0.5) return "base";
-  if (pct <= 0.85) return "desarrollo";
-  return "especifica";
-}
-
-export type HyroxLoadStation = "sled_push" | "sled_pull" | "farmers_carry" | "sandbag_lunges";
-
-const LOAD_STATION_TO_ROW_KEY: Record<HyroxLoadStation, keyof HyroxOfficialLoadRow> = {
-  sled_push: "sledPushKg",
-  sled_pull: "sledPullKg",
-  farmers_carry: "farmersCarryKgPerHand",
-  sandbag_lunges: "sandbagLungesKg"
-};
-
-// Cerebro v3, Objetivo 1, bloque A: kg prescrito para una estación cargable (Wall Balls no entra
-// aquí: no escala peso por fase, escala repeticiones — ver scaleHyroxTemplateForContext).
-export function getHyroxLoadKg(category: HyroxRaceCategory, station: HyroxLoadStation, phase: HyroxPhase): number {
-  const officialKg = HYROX_OFFICIAL_LOADS[category][LOAD_STATION_TO_ROW_KEY[station]];
-  const [minPct, maxPct] = HYROX_LOAD_PHASE_PCT[phase];
-  return Math.round(officialKg * ((minPct + maxPct) / 2));
-}
-
-const HYROX_STATION_BAND_KEYS = ["skiErg", "sledPush", "sledPull", "burpeeBroadJump", "row", "farmersCarry", "sandbagLunges", "wallBalls"] as const;
-
-// Suma el tiempo de las 8 estaciones + transiciones (roxzone) de una banda de referencia de la
-// categoría. Usado por el predictor del bloque E, paso 5.
-function sumHyroxStationsAndTransitionsSeconds(category: HyroxRaceCategory, band: HyroxBenchmarkBand): number {
-  const row = HYROX_BENCHMARKS[category];
-  const stationsSeconds = HYROX_STATION_BAND_KEYS.reduce((sum, key) => sum + parseTimeToSeconds(row[key][band]), 0);
-  return stationsSeconds + parseTimeToSeconds(row.roxzoneTotal[band]);
-}
-
-// Cerebro v3, Objetivo 1, bloque F: rango de mejora esperado sobre el tiempo "realista", según
-// frecuencia semanal. Orientativo de coaching, nunca una promesa.
-export function getHyroxExpectedImprovement(frequency: HyroxFrequencyOption): { pct8Weeks: [number, number]; pct12Weeks: [number, number] } {
-  return HYROX_IMPROVEMENT_RANGES[getHyroxImprovementFrequencyBucket(frequency)];
-}
-
-// Cerebro v3, Objetivo 1, bloque E: offset de zona "realista" (segundos por km respecto al ritmo
-// umbral) según división (Open/Pro) y dosis de entrenamiento. Se reutiliza tanto para el predictor
-// de tiempo de carrera como para mostrar el ritmo objetivo real dentro de las sesiones de carrera.
-function getHyroxRealisticZoneOffsetSecPerKm(data: HyroxOnboardingData, doseScore: number): number {
-  const divisionBias = HYROX_DIVISION_BIAS[data.division];
-  const [biasFast, biasSlow] = divisionBias.zoneOffsetRangeSecPerKm;
-  let offsetRealista = lerp(biasSlow, biasFast, doseScore);
-  if (data.runningExperience === HyroxExperienceLevel.INTERMEDIO || data.runningExperience === HyroxExperienceLevel.AVANZADO) {
-    offsetRealista -= 4;
-  }
-  return offsetRealista;
-}
-
 export function estimateHyroxFinishTime(data: HyroxOnboardingData, vamKmH?: number): { conservador: string; realista: string; agresivo?: string } {
   if (data.objective === HyroxObjective.PRIMERA_CARRERA) {
-    // Cerebro v3, Objetivo 1, bloque E: predictor ajustado por Test VAM (o ancla de categoría si no
-    // existe todavía) y por dosis de entrenamiento (frecuencia x semanas), en vez de un rango fijo
-    // por categoría igual para cualquier atleta de esa categoría.
-    const durationWeeksForDose = computeDurationWeeks(data);
-    const doseScore = computeHyroxTrainingDoseScore(data.frequency, durationWeeksForDose);
-
-    if (vamKmH && vamKmH > 0) {
-      const offsetRealista = getHyroxRealisticZoneOffsetSecPerKm(data, doseScore);
-      const offsetConservador = offsetRealista + 15;
-      const offsetAgresivo = Math.max(0, offsetRealista - 10);
-
-      let stationsTransitionRealista = lerp(
-        sumHyroxStationsAndTransitionsSeconds(data.raceCategory, "sub85"),
-        sumHyroxStationsAndTransitionsSeconds(data.raceCategory, "sub70"),
-        doseScore
-      );
-      if (data.strengthExperience === HyroxExperienceLevel.INTERMEDIO || data.strengthExperience === HyroxExperienceLevel.AVANZADO) {
-        stationsTransitionRealista *= 0.94;
-      }
-
-      return {
-        conservador: formatSecondsToTime(estimateHyroxRunningSecondsFromVAM(vamKmH, offsetConservador) + stationsTransitionRealista),
-        realista: formatSecondsToTime(estimateHyroxRunningSecondsFromVAM(vamKmH, offsetRealista) + stationsTransitionRealista),
-        agresivo: formatSecondsToTime(estimateHyroxRunningSecondsFromVAM(vamKmH, offsetAgresivo) + stationsTransitionRealista)
-      };
-    }
-
-    // Sin Test VAM todavía: el cerebro pide usar el mejor dato disponible (test 20 min, marca 5K,
-    // 10K o 1K) antes de caer en el ancla de categoría — el onboarding de Hyrox no pide ninguna de
-    // esas marcas hoy, así que se usa directamente el ancla, pero interpolada por dosis de
-    // entrenamiento en vez de un punto fijo: esto es lo que hace que 2 días/semana y 6 días/semana
-    // ya no den la misma predicción dentro de la misma categoría.
-    const [minStr, maxStr] = HYROX_DEBUTANTE_RANGE[data.raceCategory];
-    const conservadorSeconds = parseTimeToSeconds(maxStr);
-    const agresivoSecondsAnchor = parseTimeToSeconds(minStr);
-    let realistaSeconds = lerp(conservadorSeconds, agresivoSecondsAnchor, doseScore);
-    if (data.runningExperience === HyroxExperienceLevel.INTERMEDIO || data.runningExperience === HyroxExperienceLevel.AVANZADO) {
-      realistaSeconds *= 0.98;
-    }
-    return { conservador: maxStr, realista: formatSecondsToTime(realistaSeconds), agresivo: minStr };
+    const [min, max] = HYROX_DEBUTANTE_RANGE[data.raceCategory];
+    return { conservador: max, realista: formatSecondsToTime((parseTimeToSeconds(min) + parseTimeToSeconds(max)) / 2), agresivo: min };
   }
 
   if (data.objective === HyroxObjective.MEJORAR_MARCA && data.performance) {
@@ -603,14 +479,10 @@ export function detectHyroxLimitant(data: HyroxOnboardingData): {
   strengths: string[];
   weaknesses: string[];
 } {
-  // Cerebro v3, Objetivo 1, bloque C: en "Preparar mi primer HYROX" el nivel se calcula a partir de
-  // la experiencia en running/fuerza (la única que varía en este objetivo), no de experienceLevel
-  // (experiencia en Hyrox), que aquí siempre es "ninguna" por definición.
-  const effectiveLevel = data.objective === HyroxObjective.PRIMERA_CARRERA ? getHyroxObjective1Level(data) : data.experienceLevel;
   const levelEstimated =
-    effectiveLevel === HyroxExperienceLevel.AVANZADO
+    data.experienceLevel === HyroxExperienceLevel.AVANZADO
       ? "Avanzado"
-      : effectiveLevel === HyroxExperienceLevel.INTERMEDIO
+      : data.experienceLevel === HyroxExperienceLevel.INTERMEDIO
       ? "Intermedio"
       : "Principiante";
 
@@ -778,8 +650,7 @@ function pickTemplate(
   isDescarga: boolean,
   usedIds: Set<string>,
   limitant?: HyroxLimitantType,
-  secondaryLimitant?: HyroxLimitantType,
-  phase?: HyroxPhase
+  secondaryLimitant?: HyroxLimitantType
 ): HyroxWorkoutTemplate {
   let candidates = HYROX_WORKOUT_LIBRARY.filter(t => t.category === category && templateFitsGymType(t, data.gymType));
   if (candidates.length === 0) candidates = HYROX_WORKOUT_LIBRARY.filter(t => t.category === category);
@@ -789,42 +660,18 @@ function pickTemplate(
     if (lighter.length > 0) candidates = lighter;
   }
 
-  // Cerebro v3, Objetivo 1, bloque C: limitar el número de estaciones en simulación parcial según el
-  // nivel resultante — salvo avanzado en Fase Específica o Carrera, donde se permite simulación completa.
-  const isObjetivo1 = data.objective === HyroxObjective.PRIMERA_CARRERA;
-  if (category === "simulacion" && isObjetivo1) {
-    const level = getHyroxObjective1Level(data);
-    const rule = HYROX_LEVEL_RULES[level];
-    const canUseFullSimulation = rule.maxStationsPartialSim === "completa" && (phase === "especifica" || phase === "carrera");
-    if (!canUseFullSimulation) {
-      const partial = candidates.filter(t => t.id !== "hyrox-full-simulation");
-      if (partial.length > 0) candidates = partial;
-    }
-  }
-
   const unused = candidates.filter(t => !usedIds.has(t.id));
   const pool = unused.length > 0 ? unused : candidates;
-
-  // Cerebro v3, Objetivo 1, bloque D: en Pro se prefiere un nivel de dificultad más alto (la
-  // descarga ya rebajó las candidatas arriba, así que este sesgo no compite con la seguridad).
-  const DIFFICULTY_RANK: Record<HyroxWorkoutTemplate["difficulty"], number> = { BAJA: 0, MODERADA: 1, ALTA: 2 };
-  const preferHighDifficulty = isObjetivo1 && data.division === HyroxDivision.PRO && !isDescarga;
 
   if (limitant) {
     // El limitante principal cuenta doble frente al secundario al puntuar cada plantilla.
     const primaryStations = TARGET_STATIONS_BY_LIMITANT[limitant] ?? [];
     const secondaryStations = secondaryLimitant ? TARGET_STATIONS_BY_LIMITANT[secondaryLimitant] ?? [] : [];
-    const sorted = [...pool].sort((a, b) => {
-      const scoreA = a.targetStations.filter(s => primaryStations.includes(s)).length * 2 + a.targetStations.filter(s => secondaryStations.includes(s)).length;
-      const scoreB = b.targetStations.filter(s => primaryStations.includes(s)).length * 2 + b.targetStations.filter(s => secondaryStations.includes(s)).length;
-      if (scoreB !== scoreA) return scoreB - scoreA;
-      return preferHighDifficulty ? DIFFICULTY_RANK[b.difficulty] - DIFFICULTY_RANK[a.difficulty] : 0;
-    });
-    return sorted[0] ?? candidates[0];
-  }
-
-  if (preferHighDifficulty) {
-    const sorted = [...pool].sort((a, b) => DIFFICULTY_RANK[b.difficulty] - DIFFICULTY_RANK[a.difficulty]);
+    const sorted = [...pool].sort(
+      (a, b) =>
+        (b.targetStations.filter(s => primaryStations.includes(s)).length * 2 + b.targetStations.filter(s => secondaryStations.includes(s)).length) -
+        (a.targetStations.filter(s => primaryStations.includes(s)).length * 2 + a.targetStations.filter(s => secondaryStations.includes(s)).length)
+    );
     return sorted[0] ?? candidates[0];
   }
 
@@ -849,10 +696,10 @@ function computeDurationWeeks(data: HyroxOnboardingData): number {
   return 8;
 }
 
-export function generateHyroxPlan(data: HyroxOnboardingData, vamKmH?: number): HyroxTrainingPlan {
+export function generateHyroxPlan(data: HyroxOnboardingData): HyroxTrainingPlan {
   const { bmi, category: bmiCategory } = calculateBMI(data.weight, data.height);
   const limitantInfo = detectHyroxLimitant(data);
-  const estimatedFinishTime = estimateHyroxFinishTime(data, vamKmH);
+  const estimatedFinishTime = estimateHyroxFinishTime(data);
 
   const durationWeeks = computeDurationWeeks(data);
   const sessionsPerWeek = frequencyToNumber(data.frequency);
@@ -865,7 +712,6 @@ export function generateHyroxPlan(data: HyroxOnboardingData, vamKmH?: number): H
   for (let w = 0; w < durationWeeks; w++) {
     const isDescarga = (w + 1) % 4 === 0 && w !== durationWeeks - 1;
     const isRaceWeek = w === durationWeeks - 1 && !!data.raceDate;
-    const phase = computeHyroxPhase(w + 1, durationWeeks, !!data.raceDate);
     const usedIdsThisWeek = new Set<string>();
 
     const sessions: HyroxWorkoutSession[] = [];
@@ -881,8 +727,8 @@ export function generateHyroxPlan(data: HyroxOnboardingData, vamKmH?: number): H
       const category = FOCUS_TO_CATEGORY[focus] as "carrera" | "fuerza" | "acondicionamiento" | "simulacion";
 
       const template = isRaceWeek && slot === dayIndexes.length - 1
-        ? getTemplateById("half-hyrox-simulation") ?? pickTemplate("simulacion", data, true, usedIdsThisWeek, undefined, undefined, phase)
-        : pickTemplate(category, data, isDescarga || isRaceWeek, usedIdsThisWeek, limitantInfo.limitantType, limitantInfo.secondaryLimitantType, phase);
+        ? getTemplateById("half-hyrox-simulation") ?? pickTemplate("simulacion", data, true, usedIdsThisWeek)
+        : pickTemplate(category, data, isDescarga || isRaceWeek, usedIdsThisWeek, limitantInfo.limitantType, limitantInfo.secondaryLimitantType);
 
       usedIdsThisWeek.add(template.id);
       sessionCounter++;
@@ -927,8 +773,7 @@ export function generateHyroxPlan(data: HyroxOnboardingData, vamKmH?: number): H
       bmi,
       bmiCategory,
       estimatedFinishTime,
-      weakStations: data.weakStationsSelfReported ?? [],
-      expectedImprovement: data.objective === HyroxObjective.PRIMERA_CARRERA ? getHyroxExpectedImprovement(data.frequency) : undefined
+      weakStations: data.weakStationsSelfReported ?? []
     },
     weeks
   };
@@ -952,14 +797,6 @@ export interface HyroxSessionGenerationParams {
   injuryAreas: string[];
   weekNumber: number;
   durationWeeks: number;
-  // Cerebro v3, Objetivo 1, bloques A y D: sin esto, Gemini generaba la misma sesión para
-  // cualquier categoría/sexo. division ya viaja implícita en raceCategory, se manda aparte porque
-  // el sesgo de intensidad (bloque D) depende solo de ella, no del sexo.
-  raceCategory: HyroxRaceCategory;
-  division: HyroxDivision;
-  // Nota de cargas ya calculada en cliente (getHyroxLoadKg + fase) para que el prompt no tenga que
-  // duplicar la tabla de cargas oficiales ni la lógica de fase.
-  loadContextNote?: string;
 }
 
 const GEMINI_CACHE_KEY = "hyrox_gemini_session_cache";
@@ -1022,164 +859,13 @@ export async function generateHyroxSessionContent(
   }
 }
 
-// ============================================================================
-// CEREBRO v3, OBJETIVO 1 — ESCALADO DE PLANTILLAS POR CONTEXTO (bloques A, B, C, D)
-// El esqueleto del plan solo guarda un templateId; el contenido real (carga, volumen) se calcula
-// aquí, en el momento de mostrarlo, a partir de la fase de la semana y los datos del onboarding.
-// Así una misma plantilla usada en Fase Base y en Fase Específica muestra cargas distintas.
-// ============================================================================
-
-// Escala el número inicial de una etiqueta tipo "20 rep" / "500 m" / "30 seg", redondeando al
-// múltiplo de roundTo más cercano (mínimo roundTo). Si no hay número al principio, la deja igual.
-function scaleNumericLabel(label: string | undefined, multiplier: number, roundTo: number): string | undefined {
-  if (!label) return label;
-  const match = label.match(/^(\d+(?:\.\d+)?)(\s*.*)$/);
-  if (!match) return label;
-  const value = parseFloat(match[1]);
-  const rest = match[2];
-  const scaled = Math.max(roundTo, Math.round((value * multiplier) / roundTo) * roundTo);
-  return `${scaled}${rest}`;
-}
-
-// Bloques de carrera/acondicionamiento/simulación: escala rondas, repeticiones y distancia por el
-// multiplicador combinado de duración (bloque B) x extremo de rango por nivel (bloque C). La
-// duración de trabajo (ritmo/hold) no se escala: describe intensidad, no volumen.
-function scaleConditioningBlock(block: HyroxBlock, multiplier: number): HyroxBlock {
-  return {
-    ...block,
-    rounds: typeof block.rounds === "number" ? Math.max(1, Math.round(block.rounds * multiplier)) : block.rounds,
-    exercises: block.exercises.map(ex => ({
-      ...ex,
-      reps: scaleNumericLabel(ex.reps, multiplier, 1),
-      distance: scaleNumericLabel(ex.distance, multiplier, 5)
-    }))
-  };
-}
-
-// Bloques de fuerza: el número de series viene de la duración de sesión (bloque B), y la carga de
-// las estaciones cargables viene de la tabla oficial x fase, ajustada por el top-set de duración
-// (bloque A + B). Wall Balls no fracciona el peso del balón: escala repeticiones por fase en su lugar.
-function scaleStrengthBlock(
-  block: HyroxBlock,
-  seriesCount: number,
-  category: HyroxRaceCategory,
-  phase: HyroxPhase,
-  topsetAdjustPct: number,
-  restReductionPct: number
-): HyroxBlock {
-  const [minPct, maxPct] = HYROX_LOAD_PHASE_PCT[phase];
-  const adjustedPct = Math.min(1, Math.max(0.3, (minPct + maxPct) / 2 + topsetAdjustPct / 100));
-
-  return {
-    ...block,
-    rounds: typeof block.rounds === "number" ? seriesCount : block.rounds,
-    restBetween: restReductionPct > 0 ? scaleNumericLabel(block.restBetween, 1 - restReductionPct / 100, 5) : block.restBetween,
-    exercises: block.exercises.map((ex): HyroxExercise => {
-      if (ex.station === "sled_push" || ex.station === "sled_pull" || ex.station === "farmers_carry" || ex.station === "sandbag_lunges") {
-        const officialKg = HYROX_OFFICIAL_LOADS[category][LOAD_STATION_TO_ROW_KEY[ex.station]];
-        return { ...ex, detail: `${Math.round(officialKg * adjustedPct)} kg` };
-      }
-      if (ex.station === "wall_balls") {
-        const official = HYROX_OFFICIAL_LOADS[category];
-        const midPct = (minPct + maxPct) / 2;
-        const repsScaled = Math.max(5, Math.round((official.wallBallsReps * midPct) / 5) * 5);
-        return { ...ex, reps: `${repsScaled} rep`, detail: `Balón ${official.wallBallsKg} kg / diana ${official.wallBallsTargetM} m` };
-      }
-      return ex;
-    })
-  };
-}
-
-// Nota de cargas en texto plano para el prompt de Gemini (bloque A): evita que el servidor tenga
-// que reimplementar la tabla de cargas oficiales y el cálculo de fase.
-export function buildHyroxLoadContextNote(onboarding: HyroxOnboardingData, weekNumber: number, durationWeeks: number): string {
-  const phase = computeHyroxPhase(weekNumber, durationWeeks, !!onboarding.raceDate);
-  const category = onboarding.raceCategory;
-  const sledPush = getHyroxLoadKg(category, "sled_push", phase);
-  const sledPull = getHyroxLoadKg(category, "sled_pull", phase);
-  const farmers = getHyroxLoadKg(category, "farmers_carry", phase);
-  const sandbag = getHyroxLoadKg(category, "sandbag_lunges", phase);
-  const official = HYROX_OFFICIAL_LOADS[category];
-  return `Cargas para esta fase (${phase}) en la categoría ${category}: Sled Push ~${sledPush} kg, Sled Pull ~${sledPull} kg, Farmers Carry ~${farmers} kg por mano, Sandbag Lunges ~${sandbag} kg, Wall Balls balón ${official.wallBallsKg} kg a diana de ${official.wallBallsTargetM} m (usa reps por debajo de las ${official.wallBallsReps} oficiales cuanto más lejos esté la fase de la carrera).`;
-}
-
-// Cerebro v3, sección HYROX RUNNING PREDICTION ENGINE: una vez existe Test VAM, las sesiones de
-// carrera dejan de mostrar la intensidad como "% ritmo umbral" abstracto y muestran el ritmo real
-// en min/km — misma idea que el módulo de running (zonas de ritmo calculadas, no porcentajes).
-const PACE_ZONE_PCT_DETAIL = /^(\d+)% ritmo umbral$/;
-
-function applyHyroxPaceZoneToExercise(ex: HyroxExercise, vamKmH: number, raceOffsetSecPerKm: number): HyroxExercise {
-  if (ex.station !== "run" || !ex.detail) return ex;
-  const thresholdPaceSecPerKm = getHyroxThresholdPaceSecPerKm(vamKmH);
-
-  const pctMatch = ex.detail.match(PACE_ZONE_PCT_DETAIL);
-  if (pctMatch) {
-    const pct = Number(pctMatch[1]);
-    const paceSecPerKm = pct > 0 ? (thresholdPaceSecPerKm * 100) / pct : thresholdPaceSecPerKm;
-    return { ...ex, detail: `Ritmo objetivo: ${formatPaceMinKm(paceSecPerKm / 60)}/km` };
-  }
-
-  if (ex.detail === "Ritmo objetivo de carrera") {
-    const paceSecPerKm = thresholdPaceSecPerKm + raceOffsetSecPerKm;
-    return { ...ex, detail: `Ritmo objetivo: ${formatPaceMinKm(paceSecPerKm / 60)}/km` };
-  }
-
-  return ex;
-}
-
-function applyHyroxPaceZonesToBlock(block: HyroxBlock, vamKmH: number, raceOffsetSecPerKm: number): HyroxBlock {
-  return { ...block, exercises: block.exercises.map(ex => applyHyroxPaceZoneToExercise(ex, vamKmH, raceOffsetSecPerKm)) };
-}
-
-export interface HyroxSessionScalingContext {
-  onboarding: HyroxOnboardingData;
-  weekNumber: number;
-  durationWeeks: number;
-  // Del Test VAM más reciente (obligatorio en el onboarding de Objetivo 1, opcional en el resto).
-  // Sin él, las sesiones de carrera siguen mostrando la intensidad como "% ritmo umbral".
-  vamKmH?: number;
-}
-
-export function scaleHyroxTemplateForContext(template: HyroxWorkoutTemplate, context: HyroxSessionScalingContext): HyroxWorkoutTemplate {
-  const { onboarding, weekNumber, durationWeeks, vamKmH } = context;
-  const phase = computeHyroxPhase(weekNumber, durationWeeks, !!onboarding.raceDate);
-  const durationMultiplier = HYROX_DURATION_VOLUME_MULTIPLIER[onboarding.sessionDurationMin];
-  const level = onboarding.objective === HyroxObjective.PRIMERA_CARRERA ? getHyroxObjective1Level(onboarding) : onboarding.experienceLevel;
-  const rangeMultiplier = HYROX_LEVEL_RULES[level].rangeExtremeMultiplier;
-  const divisionBias = HYROX_DIVISION_BIAS[onboarding.division];
-
-  if (template.category === "fuerza") {
-    const seriesCount = HYROX_DURATION_STRENGTH_SERIES[onboarding.sessionDurationMin];
-    const topsetAdjustPct = HYROX_DURATION_TOPSET_ADJUST_PP[onboarding.sessionDurationMin];
-    return {
-      ...template,
-      blocks: template.blocks.map(b => scaleStrengthBlock(b, seriesCount, onboarding.raceCategory, phase, topsetAdjustPct, divisionBias.restReductionPct))
-    };
-  }
-
-  const combinedConditioningMultiplier = durationMultiplier * rangeMultiplier;
-  let blocks = template.blocks.map(b => scaleConditioningBlock(b, combinedConditioningMultiplier));
-
-  if (template.category === "carrera" && vamKmH && vamKmH > 0) {
-    const doseScore = computeHyroxTrainingDoseScore(onboarding.frequency, durationWeeks);
-    const raceOffset = getHyroxRealisticZoneOffsetSecPerKm(onboarding, doseScore);
-    blocks = blocks.map(b => applyHyroxPaceZonesToBlock(b, vamKmH, raceOffset));
-  }
-
-  return { ...template, blocks };
-}
-
-// Punto único de resolución de contenido de sesión: usa la versión de Gemini si ya se generó y
-// quedó cacheada para esta sesión; si no, cae en la plantilla estática. Si se pasa contexto (fase
-// de la semana + datos del onboarding), el resultado se escala en carga y volumen (bloques A-D);
-// sin contexto, se devuelve la plantilla base sin escalar (compatibilidad hacia atrás).
-export function resolveHyroxSessionTemplate(session: HyroxWorkoutSession, context?: HyroxSessionScalingContext): HyroxWorkoutTemplate | undefined {
+// Punto único de resolución de contenido de sesión: usa la versión de Gemini si ya
+// se generó y quedó cacheada para esta sesión; si no, cae en la plantilla estática.
+export function resolveHyroxSessionTemplate(session: HyroxWorkoutSession): HyroxWorkoutTemplate | undefined {
   if (!session.templateId) return undefined;
   const cached = getCachedGeneratedSession(session.id);
-  const base = cached ?? getTemplateById(session.templateId);
-  if (!base) return undefined;
-  if (!context || session.category === "descanso") return base;
-  return scaleHyroxTemplateForContext(base, context);
+  if (cached) return cached;
+  return getTemplateById(session.templateId);
 }
 
 // ============================================================================

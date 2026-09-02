@@ -4,9 +4,11 @@ import {
   OnboardingData,
   TrainingPlan,
   DailyReadinessInput,
-  RunningVAMTestResult
+  RunningObjective,
+  RunningVAMTestResult,
+  WorkoutCompletionRecord
 } from "./types";
-import { generateTrainingPlan, recalculateFuturePlanSessions } from "./engines";
+import { generateTrainingPlan, calculateTrainingZones, estimateTargetsFromVAM, NEEDS_VAM_OBJECTIVES } from "./engines";
 
 // View components
 import Dashboard from "./Dashboard";
@@ -14,6 +16,7 @@ import WeeklyPlanView from "./WeeklyPlanView";
 import TodayWorkoutView from "./TodayWorkoutView";
 import ProfileView from "./ProfileView";
 import CalendarView from "./CalendarView";
+import VAMRequiredLock from "./VAMRequiredLock";
 
 // Icons
 import {
@@ -23,15 +26,13 @@ import {
   Flame,
   LogOut,
   User,
-  ArrowLeftRight
+  ArrowLeftRight,
+  Lock
 } from "lucide-react";
 
 interface AppProps {
   onSwitchDiscipline?: () => void;
   onResetToLanding: () => void;
-  // "dashboard" justo al terminar el onboarding (para ver el diagnóstico inicial primero);
-  // "today" en cualquier otra entrada (usuario que vuelve a un plan ya existente).
-  initialTab?: "dashboard" | "today";
 }
 
 function loadJSON<T>(key: string, fallback: T): T {
@@ -44,25 +45,41 @@ function loadJSON<T>(key: string, fallback: T): T {
   }
 }
 
-export default function App({ onSwitchDiscipline, onResetToLanding, initialTab = "today" }: AppProps) {
+export default function App({ onSwitchDiscipline, onResetToLanding }: AppProps) {
   // Root.tsx solo monta App cuando ya existe un plan de running guardado, así que este componente
   // no necesita sus propias pantallas de landing/onboarding: se inicializa directamente con los
   // datos persistidos (lazy init, sin useEffect posterior) para no mostrar ningún flash intermedio.
-  const [activeTab, setActiveTab] = useState<"dashboard" | "today" | "plan" | "profile" | "calendar">(initialTab);
+  // Si el Test VAM sigue pendiente, arranca directamente en Diagnóstico (nunca en Hoy/Mi Plan/
+  // Calendario, que están bloqueados hasta completarlo) para no mostrar ni un frame bloqueado.
+  const [activeTab, setActiveTab] = useState<"dashboard" | "today" | "plan" | "profile" | "calendar">(() => {
+    const savedOnboarding = loadJSON<OnboardingData | null>("run_plan_onboarding", null);
+    const savedVamTest = loadJSON<RunningVAMTestResult | null>("run_plan_vam_test", null);
+    if (savedOnboarding && NEEDS_VAM_OBJECTIVES.has(savedOnboarding.objective) && !savedVamTest) return "dashboard";
+    return "today";
+  });
 
   const [onboarding, setOnboarding] = useState<OnboardingData | null>(() => loadJSON("run_plan_onboarding", null));
   const [plan, setPlan] = useState<TrainingPlan | null>(() => loadJSON("run_plan_data", null));
   const [currentWeekIndex, setCurrentWeekIndex] = useState<number>(() => Number(localStorage.getItem("run_plan_current_week") || "0"));
   const [readinessHistory, setReadinessHistory] = useState<Record<string, DailyReadinessInput>>(() => loadJSON("run_plan_readiness", {}));
-  const [completedWorkouts, setCompletedWorkouts] = useState<Record<string, { feedback: string; rpe: number; date: string }>>(() =>
+  const [completedWorkouts, setCompletedWorkouts] = useState<Record<string, WorkoutCompletionRecord>>(() =>
     loadJSON("run_plan_completed_workouts", {})
   );
   const [vamTest, setVamTest] = useState<RunningVAMTestResult | null>(() => loadJSON("run_plan_vam_test", null));
-  const [vamHistory, setVamHistory] = useState<RunningVAMTestResult[]>(() => loadJSON("run_plan_vam_history", []));
+
+  // El plan solo se puede entrenar (Hoy/Mi Plan/Calendario) una vez completado el Test VAM real:
+  // ningún cálculo debe basarse en un tiempo introducido en el onboarding que puede ser antiguo.
+  const vamRequired = !!onboarding && NEEDS_VAM_OBJECTIVES.has(onboarding.objective) && !vamTest;
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
   }, [activeTab]);
+
+  useEffect(() => {
+    if (vamRequired && activeTab === "today") {
+      setActiveTab("dashboard");
+    }
+  }, [vamRequired, activeTab]);
 
   const handleSetCurrentWeekIndex = (idx: number) => {
     setCurrentWeekIndex(idx);
@@ -70,33 +87,13 @@ export default function App({ onSwitchDiscipline, onResetToLanding, initialTab =
   };
 
   const handleUpdateProfile = (data: OnboardingData) => {
-    // El VAM ya existe (es obligatorio antes de tener un plan): reutilizamos el vigente, nunca se
-    // regenera el plan sin un Test VAM real detrás.
-    const newPlan = generateTrainingPlan(data, vamTest?.vamKmH ?? 0);
+    const newPlan = generateTrainingPlan(data);
 
     setOnboarding(data);
     setPlan(newPlan);
 
     localStorage.setItem("run_plan_onboarding", JSON.stringify(data));
     localStorage.setItem("run_plan_data", JSON.stringify(newPlan));
-  };
-
-  // Módulo 10 (RUNNING_AI_DECISION_ENGINE): al repetir el Test VAM se recalculan zonas y predictor,
-  // y se reescribe el contenido de toda sesión aún no completada (pasada o futura). Las sesiones ya
-  // completadas conservan su histórico tal y como se entrenaron.
-  const handleSaveVamRetest = (result: RunningVAMTestResult) => {
-    if (!plan || !onboarding) return;
-
-    const updatedPlan = recalculateFuturePlanSessions(plan, onboarding, result.vamKmH);
-    const updatedHistory = [...vamHistory, result];
-
-    setPlan(updatedPlan);
-    setVamTest(result);
-    setVamHistory(updatedHistory);
-
-    localStorage.setItem("run_plan_data", JSON.stringify(updatedPlan));
-    localStorage.setItem("run_plan_vam_test", JSON.stringify(result));
-    localStorage.setItem("run_plan_vam_history", JSON.stringify(updatedHistory));
   };
 
   const handleSaveReadiness = (input: DailyReadinessInput) => {
@@ -113,18 +110,59 @@ export default function App({ onSwitchDiscipline, onResetToLanding, initialTab =
     localStorage.setItem("run_plan_readiness", JSON.stringify(newHistory));
   };
 
-  const handleLogWorkoutCompletion = (workoutId: string, feedback: string, rpe: number) => {
-    const newCompleted = {
+  const handleLogWorkoutCompletion = (
+    workoutId: string,
+    feedback: string,
+    rpe: number,
+    actualDistanceKm?: number,
+    actualTimeSeconds?: number
+  ) => {
+    const newCompleted: Record<string, WorkoutCompletionRecord> = {
       ...completedWorkouts,
       [workoutId]: {
         feedback,
         rpe,
-        date: new Date().toISOString()
+        date: new Date().toISOString(),
+        actualDistanceKm,
+        actualTimeSeconds
       }
     };
 
     setCompletedWorkouts(newCompleted);
     localStorage.setItem("run_plan_completed_workouts", JSON.stringify(newCompleted));
+  };
+
+  const handleSaveVAMTest = (result: RunningVAMTestResult) => {
+    setVamTest(result);
+    localStorage.setItem("run_plan_vam_test", JSON.stringify(result));
+
+    // Mi Primer 10K, Mejorar 10K, Mi Primer 21K, Mejorar 21K y Mejorar Ritmo dependen del Test VAM:
+    // es la única marca de referencia fiable (no un tiempo introducido que puede ser antiguo), así
+    // que solo al completarlo se calculan sus zonas de ritmo y objetivos de carrera reales.
+    if (plan && onboarding && NEEDS_VAM_OBJECTIVES.has(onboarding.objective)) {
+      const zones = calculateTrainingZones({
+        ...onboarding,
+        time10K: undefined,
+        time21K: undefined,
+        vamTestDistance: result.distanceMeters
+      });
+      const raceDistance =
+        onboarding.objective === RunningObjective.PRIMER_21K || onboarding.objective === RunningObjective.MEJORAR_21K
+          ? "21K"
+          : "10K";
+      const { targets, estimatedPaces } = estimateTargetsFromVAM(result.vamKmH, plan.initialDiagnostic.levelEstimated, raceDistance);
+      const updatedPlan: TrainingPlan = {
+        ...plan,
+        zones,
+        initialDiagnostic: {
+          ...plan.initialDiagnostic,
+          targets,
+          estimatedPaces
+        }
+      };
+      setPlan(updatedPlan);
+      localStorage.setItem("run_plan_data", JSON.stringify(updatedPlan));
+    }
   };
 
   const handleResetAll = () => {
@@ -134,18 +172,19 @@ export default function App({ onSwitchDiscipline, onResetToLanding, initialTab =
     localStorage.removeItem("run_plan_readiness");
     localStorage.removeItem("run_plan_completed_workouts");
     localStorage.removeItem("run_plan_vam_test");
-    localStorage.removeItem("run_plan_vam_history");
     onResetToLanding();
   };
 
   const todayKey = new Date().toISOString().split("T")[0];
   const todayReadiness = readinessHistory[todayKey];
 
-  const bottomNavButtonClass = (tab: "today" | "dashboard" | "plan" | "profile" | "calendar") =>
-    `py-1.5 px-2 text-[9px] font-bold uppercase tracking-wider transition flex flex-col items-center justify-center gap-1 cursor-pointer relative text-center min-w-0 ${
-      activeTab === tab
-        ? "text-black font-extrabold"
-        : "text-zinc-400 hover:text-zinc-700"
+  const bottomNavButtonClass = (tab: "today" | "dashboard" | "plan" | "profile" | "calendar", locked: boolean = false) =>
+    `py-1.5 px-2 text-[9px] font-bold uppercase tracking-wider transition flex flex-col items-center justify-center gap-1 relative text-center min-w-0 ${
+      locked
+        ? "text-zinc-300 cursor-not-allowed"
+        : activeTab === tab
+        ? "text-black font-extrabold cursor-pointer"
+        : "text-zinc-400 hover:text-zinc-700 cursor-pointer"
     }`;
 
   return (
@@ -230,13 +269,17 @@ export default function App({ onSwitchDiscipline, onResetToLanding, initialTab =
                 activeInjury={onboarding?.activeInjury || false}
                 injuryAreas={onboarding?.injuryAreas || []}
                 vamTest={vamTest}
-                vamHistory={vamHistory}
-                onSaveVamRetest={handleSaveVamRetest}
+                onSaveVAMTest={handleSaveVAMTest}
+                completedWorkouts={completedWorkouts}
               />
             </motion.div>
           )}
 
-          {activeTab === "today" && plan && (
+          {activeTab === "today" && plan && (vamRequired ? (
+            <motion.div key="today-locked" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+              <VAMRequiredLock onGoToDiagnostico={() => setActiveTab("dashboard")} />
+            </motion.div>
+          ) : (
             <motion.div
               key="today"
               initial={{ opacity: 0 }}
@@ -255,7 +298,7 @@ export default function App({ onSwitchDiscipline, onResetToLanding, initialTab =
                 injuryAreas={onboarding?.injuryAreas || []}
               />
             </motion.div>
-          )}
+          ))}
 
           {activeTab === "plan" && plan && (
             <motion.div
@@ -275,6 +318,8 @@ export default function App({ onSwitchDiscipline, onResetToLanding, initialTab =
                 onSaveReadiness={handleSaveReadiness}
                 activeInjury={onboarding?.activeInjury || false}
                 injuryAreas={onboarding?.injuryAreas || []}
+                vamRequired={vamRequired}
+                onGoToDiagnostico={() => setActiveTab("dashboard")}
               />
             </motion.div>
           )}
@@ -316,9 +361,9 @@ export default function App({ onSwitchDiscipline, onResetToLanding, initialTab =
       {plan && (
         <div className="fixed bottom-4 left-0 right-0 z-50 px-4 flex justify-center pointer-events-none">
           <div className="pointer-events-auto bg-white/90 backdrop-blur-xl border border-zinc-200/80 px-2.5 py-2 rounded-full shadow-[0_12px_35px_rgba(0,0,0,0.08)] flex items-center justify-around gap-1 max-w-md w-full">
-            <button onClick={() => setActiveTab("today")} className={bottomNavButtonClass("today")}>
+            <button onClick={() => !vamRequired && setActiveTab("today")} className={bottomNavButtonClass("today", vamRequired)}>
               <div className={`p-2 rounded-full transition-all duration-200 ${activeTab === "today" ? "bg-black text-white shadow-md scale-105" : "hover:bg-zinc-100"}`}>
-                <Flame className="w-4 h-4" />
+                {vamRequired ? <Lock className="w-4 h-4" /> : <Flame className="w-4 h-4" />}
               </div>
               <span className="text-[9px]">Hoy</span>
             </button>
@@ -332,13 +377,13 @@ export default function App({ onSwitchDiscipline, onResetToLanding, initialTab =
 
             <button onClick={() => setActiveTab("plan")} className={bottomNavButtonClass("plan")}>
               <div className={`p-2 rounded-full transition-all duration-200 ${activeTab === "plan" ? "bg-black text-white shadow-md scale-105" : "hover:bg-zinc-100"}`}>
-                <svg 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="2.2" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                   className="w-4 h-4"
                 >
                   <path d="M13.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6.5L13.5 2z" />

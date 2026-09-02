@@ -187,6 +187,41 @@ export default function CalendarView({ plan, completedWorkouts }: CalendarViewPr
     return completedSessions.filter((s) => s.localDate === selectedDayStr);
   }, [selectedDayStr, completedSessions]);
 
+  // Monthly legend stats: entrenamientos realizados (fuerza/carrera) y días de descanso previstos,
+  // cada uno como recuento y % sobre el total de días del mes mostrado.
+  const monthStats = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    let fuerzaCount = 0;
+    let carreraCount = 0;
+    let descansoCount = 0;
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
+      const dateStr = getLocalDateString(date);
+
+      if (completedSessions.some((s) => s.localDate === dateStr && s.type === "fuerza")) fuerzaCount++;
+      if (completedSessions.some((s) => s.localDate === dateStr && s.type === "carrera")) carreraCount++;
+
+      const planWeekIndex = getWeekIndexForDate(date);
+      if (planWeekIndex >= 0 && planWeekIndex < plan.weeks.length) {
+        const dayIndex = date.getDay() === 0 ? 6 : date.getDay() - 1;
+        const session = plan.weeks[planWeekIndex].sessions.find((s) => s.dayIndex === dayIndex);
+        if (session && session.type === "descanso") descansoCount++;
+      }
+    }
+
+    const pct = (count: number) => (daysInMonth > 0 ? Math.round((count / daysInMonth) * 100) : 0);
+    return {
+      daysInMonth,
+      fuerza: { count: fuerzaCount, pct: pct(fuerzaCount) },
+      carrera: { count: carreraCount, pct: pct(carreraCount) },
+      descanso: { count: descansoCount, pct: pct(descansoCount) }
+    };
+  }, [currentDate, completedSessions, plan]);
+
   return (
     <div className="max-w-4xl mx-auto pb-12 space-y-8">
       {/* Header */}
@@ -339,19 +374,35 @@ export default function CalendarView({ plan, completedWorkouts }: CalendarViewPr
       <div className="p-5 bg-white border border-zinc-200/80 rounded-2xl space-y-4 max-w-xl mx-auto shadow-sm">
         <div className="text-center">
           <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block font-sans">
-            Leyenda de Entrenamientos
+            Leyenda de Entrenamientos · {monthNames[currentDate.getMonth()]}
           </span>
         </div>
-        
-        {/* Row 1: Orange Circle and Blue Circle */}
-        <div className="flex items-center justify-center gap-6 text-xs font-semibold text-zinc-700 font-sans">
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-orange-500" />
-            <span>Fuerza</span>
+
+        {/* Row 1: Monthly stats per type */}
+        <div className="grid grid-cols-3 gap-3 text-center font-sans">
+          <div className="p-3 bg-orange-50/60 border border-orange-200 rounded-xl">
+            <div className="flex items-center justify-center gap-1.5 mb-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-orange-700">Fuerza</span>
+            </div>
+            <p className="text-lg font-black text-zinc-900 font-mono">{monthStats.fuerza.count}</p>
+            <p className="text-[10px] text-zinc-500 font-medium">{monthStats.fuerza.pct}% del mes</p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-blue-600" />
-            <span>Carrera</span>
+          <div className="p-3 bg-blue-50/60 border border-blue-200 rounded-xl">
+            <div className="flex items-center justify-center gap-1.5 mb-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Carrera</span>
+            </div>
+            <p className="text-lg font-black text-zinc-900 font-mono">{monthStats.carrera.count}</p>
+            <p className="text-[10px] text-zinc-500 font-medium">{monthStats.carrera.pct}% del mes</p>
+          </div>
+          <div className="p-3 bg-zinc-50 border border-zinc-200/80 rounded-xl">
+            <div className="flex items-center justify-center gap-1.5 mb-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-zinc-400" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-600">Descanso</span>
+            </div>
+            <p className="text-lg font-black text-zinc-900 font-mono">{monthStats.descanso.count}</p>
+            <p className="text-[10px] text-zinc-500 font-medium">{monthStats.descanso.pct}% del mes</p>
           </div>
         </div>
 

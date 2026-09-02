@@ -5,6 +5,7 @@ import { STATION_LABELS } from "./hyroxLibrary";
 import { calculateBMI, calculateHyroxTrainingZones } from "./hyroxEngine";
 import { formatDateEU } from "./engines";
 import HyroxRaceStrategyCard from "./HyroxRaceStrategyCard";
+import WhatsAppChatButton from "./WhatsAppChatButton";
 import { User, Activity, Check, Calendar, TrendingUp, Flag, Dumbbell, Gauge } from "lucide-react";
 
 interface HyroxProfileViewProps {
@@ -309,6 +310,16 @@ export default function HyroxProfileView({ onboarding, plan, onUpdateProfile, co
       )}
 
       <HyroxRaceStrategyCard onboarding={onboarding} />
+
+      <div className="bg-white rounded-2xl p-5 border border-zinc-200/80 shadow-sm space-y-3 text-center">
+        <div>
+          <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-900">¿Tienes alguna duda?</h4>
+          <p className="text-xs text-zinc-500 font-medium mt-1">
+            Escríbenos y te ayudamos con tu plan, tu progreso o cualquier pregunta.
+          </p>
+        </div>
+        <WhatsAppChatButton />
+      </div>
     </div>
   );
 }

@@ -1,14 +1,16 @@
 import React, { useState } from "react";
 import { motion } from "motion/react";
-import { 
-  TrainingPlan, 
-  DailyReadinessInput, 
-  WorkoutSession, 
-  DailyReadinessScore 
+import {
+  TrainingPlan,
+  DailyReadinessInput,
+  WorkoutSession,
+  DailyReadinessScore,
+  WorkoutCompletionRecord
 } from "./types";
-import { 
-  runDailyExecutionEngine, 
-  calculateReadiness 
+import {
+  runDailyExecutionEngine,
+  calculateReadiness,
+  parseTimeToSeconds
 } from "./engines";
 import { 
   Activity, 
@@ -30,6 +32,7 @@ import {
   Info,
   Lock
 } from "lucide-react";
+import AnalyzingDataScreen from "./AnalyzingDataScreen";
 
 function getSleepQualityColor(q: "bueno" | "normal" | "malo", isSelected: boolean): string {
   if (!isSelected) return "bg-white border-zinc-200 hover:border-zinc-300 text-zinc-700";
@@ -92,17 +95,6 @@ function formatExercise(exercise: string): string {
   return exercise;
 }
 
-// Separa "3x10" / "3x10 por lado" / "3x40s" en el número de series (rounds) y el resto de la
-// prescripción (reps). Ambos ejercicios de una biserie comparten el mismo número de series: se toma
-// el primero que aparezca en el bloque.
-function splitRoundsAndReps(details: string): { rounds: string | null; reps: string } {
-  const match = details.match(/^(\d+)\s*[x×*]\s*(.+)$/i);
-  if (match) {
-    return { rounds: match[1], reps: match[2].trim() };
-  }
-  return { rounds: null, reps: details };
-}
-
 function parseExerciseDetails(exercise: string): { name: string; details: string } {
   const match = exercise.match(/^(.*?)\s*[\(\[]([^\]\)]*)[\)\]]$/);
   if (match) {
@@ -129,8 +121,8 @@ interface TodayWorkoutViewProps {
   currentWeekIndex?: number;
   readiness: DailyReadinessInput | undefined;
   onSaveReadiness: (input: DailyReadinessInput) => void;
-  onLogWorkoutCompletion: (workoutId: string, feedback: string, rpe: number) => void;
-  completedWorkouts: Record<string, { feedback: string; rpe: number; date: string }>;
+  onLogWorkoutCompletion: (workoutId: string, feedback: string, rpe: number, actualDistanceKm?: number, actualTimeSeconds?: number) => void;
+  completedWorkouts: Record<string, WorkoutCompletionRecord>;
   activeInjury: boolean;
   injuryAreas: string[];
 }
@@ -157,9 +149,11 @@ export default function TodayWorkoutView({
   // Completion logging states
   const [feedback, setFeedback] = useState<string>("adecuado");
   const [loggedRpe, setLoggedRpe] = useState<number>(5);
+  const [actualDistanceKm, setActualDistanceKm] = useState<string>("");
+  const [actualTime, setActualTime] = useState<string>("");
 
   // Session steps tracking state: preview, questionnaire, adapted, executing, feedback
-  const [sessionSteps, setSessionSteps] = useState<Record<string, "preview" | "questionnaire" | "adapted" | "executing" | "feedback">>({});
+  const [sessionSteps, setSessionSteps] = useState<Record<string, "preview" | "questionnaire" | "analyzing" | "adapted" | "executing" | "feedback">>({});
   const [currentExecIdx, setCurrentExecIdx] = useState<number>(0);
   const [activeCompletedSteps, setActiveCompletedSteps] = useState<Record<number, boolean>>({});
 
@@ -297,8 +291,11 @@ export default function TodayWorkoutView({
       prevRPE: prevRpe
     };
     onSaveReadiness(input);
-    setSessionSteps(prev => ({ ...prev, [sessionId]: "adapted" }));
+    setSessionSteps(prev => ({ ...prev, [sessionId]: "analyzing" }));
     window.scrollTo({ top: 0, behavior: "smooth" });
+    setTimeout(() => {
+      setSessionSteps(prev => ({ ...prev, [sessionId]: "adapted" }));
+    }, 2000);
   };
 
   const getDayName = (idx: number) => {
@@ -365,10 +362,6 @@ export default function TodayWorkoutView({
     blockTitle?: string;
     originalIndex?: number;
     totalInPhase?: number;
-    // Solo para mainWork: la biserie completa del bloque, para mostrar todos sus ejercicios juntos
-    // en el mismo paso en vez de partirlos uno por pantalla.
-    exercises?: Array<{ name: string; reps: string }>;
-    rounds?: string | null;
   }> = [];
 
   if (workoutToExecute) {
@@ -395,27 +388,30 @@ export default function TodayWorkoutView({
       });
     }
 
-    // 3. Main Work steps: un paso por BLOQUE (biserie), no por ejercicio — así se ve que los
-    // ejercicios de un mismo bloque van seguidos y juntos forman una sola serie a repetir.
+    // 3. Main Work steps
     if (workoutToExecute.mainWork) {
       const mainBlocks = parseMainWork(workoutToExecute.mainWork);
-
-      mainBlocks.forEach((block, idx) => {
-        const parsedExercises = block.exercises.map(ex => {
-          const { name, details } = parseExerciseDetails(ex);
-          return { name, ...splitRoundsAndReps(details) };
+      const mainWorkExercises: Array<{ name: string; details: string; blockTitle: string }> = [];
+      mainBlocks.forEach(block => {
+        block.exercises.forEach(ex => {
+          const parsed = parseExerciseDetails(ex);
+          mainWorkExercises.push({
+            name: parsed.name,
+            details: parsed.details,
+            blockTitle: block.title
+          });
         });
-        const rounds = parsedExercises.find(e => e.rounds)?.rounds ?? null;
+      });
 
+      mainWorkExercises.forEach((ex, idx) => {
         executionSteps.push({
           type: "mainWork",
-          title: `Trabajo Principal (${idx + 1}/${mainBlocks.length})`,
-          name: block.title || `Bloque ${idx + 1}`,
-          blockTitle: block.title,
-          exercises: parsedExercises.map(e => ({ name: e.name, reps: e.reps })),
-          rounds,
+          title: `Trabajo Principal (${idx + 1}/${mainWorkExercises.length})`,
+          name: ex.name,
+          details: ex.details,
+          blockTitle: ex.blockTitle,
           originalIndex: idx,
-          totalInPhase: mainBlocks.length
+          totalInPhase: mainWorkExercises.length
         });
       });
     }
@@ -571,11 +567,6 @@ export default function TodayWorkoutView({
                 <h4 className="text-base sm:text-lg font-bold text-zinc-900 uppercase tracking-tight mt-0.5">
                   {session.name}
                 </h4>
-                {session.isVamRetest && !isCompleted && (
-                  <span className="inline-block mt-1 text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 uppercase tracking-wider">
-                    Repetición obligatoria del Test VAM
-                  </span>
-                )}
                 {isCompleted && (
                   <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-wider mt-0.5 flex items-center gap-1">
                     ✓ Completada • RPE {completedWorkouts[session.id]?.rpe}/10
@@ -865,6 +856,9 @@ export default function TodayWorkoutView({
                 </div>
               )}
 
+              {/* STEP B.2: ANALYZING TRANSITION */}
+              {step === "analyzing" && <AnalyzingDataScreen />}
+
               {/* STEP C: ADAPTED WORKOUT VIEW */}
               {step === "adapted" && (
                 <div className="space-y-6">
@@ -917,19 +911,6 @@ export default function TodayWorkoutView({
                           <p className="text-xs text-zinc-600 font-medium leading-relaxed max-w-2xl font-sans">
                             {sessionAdaptationResult.justification}
                           </p>
-                        </div>
-
-                        <div className="flex flex-col items-start sm:items-end gap-1 shrink-0 font-mono">
-                          <span className="text-[9px] text-zinc-400 uppercase font-bold tracking-wider">Riesgo de Lesión</span>
-                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
-                            sessionAdaptationResult.injuryRisk === "Bajo" 
-                              ? "bg-emerald-100 text-emerald-800 border border-emerald-200" 
-                              : sessionAdaptationResult.injuryRisk === "Moderado" 
-                                ? "bg-amber-100 text-amber-800 border border-amber-200" 
-                                : "bg-rose-100 text-rose-800 border border-rose-200 animate-pulse"
-                          }`}>
-                            {sessionAdaptationResult.injuryRisk}
-                          </span>
                         </div>
                       </div>
 
@@ -1167,78 +1148,30 @@ export default function TodayWorkoutView({
                         </span>
                       </div>
 
-                      {currentStep.type === "mainWork" && currentStep.exercises && currentStep.exercises.length > 0 ? (
-                        // Bloque completo (biserie): todos sus ejercicios se muestran juntos, en el
-                        // orden en que hay que hacerlos, dejando claro cuántas series hay que repetir.
-                        <div className="space-y-4">
-                          {currentStep.rounds && (
-                            <div className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider">
-                              {currentStep.rounds} Series
-                            </div>
-                          )}
-                          <h3 className="text-lg sm:text-xl font-black text-zinc-900 uppercase tracking-tight leading-snug max-w-2xl mx-auto">
-                            {currentStep.name}
-                          </h3>
-                          <div className="max-w-md mx-auto space-y-2 text-left">
-                            {currentStep.exercises.map((ex, exIdx) => (
-                              <React.Fragment key={exIdx}>
-                                <div className="flex items-center gap-3 bg-zinc-50 border border-zinc-200/80 rounded-xl px-4 py-3">
-                                  <span className="shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-black flex items-center justify-center">
-                                    {exIdx + 1}
-                                  </span>
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-bold text-zinc-900 truncate">{ex.name}</p>
-                                    {ex.reps && (
-                                      <p className="text-xs font-mono font-bold text-blue-600">{ex.reps}</p>
-                                    )}
-                                  </div>
-                                </div>
-                                {currentStep.exercises && exIdx < currentStep.exercises.length - 1 && (
-                                  <div className="flex items-center justify-center gap-1 text-[9px] font-bold uppercase tracking-wider text-zinc-400 py-0.5">
-                                    ↓ luego, sin descanso
-                                  </div>
-                                )}
-                              </React.Fragment>
-                            ))}
-                          </div>
-                          {currentStep.exercises.length > 1 && (
-                            <p className="text-[11px] text-zinc-500 font-medium leading-relaxed max-w-md mx-auto">
-                              Haz estos {currentStep.exercises.length} ejercicios seguidos, en este orden: eso es{" "}
-                              <strong className="text-zinc-900">1 serie</strong>.{" "}
-                              {currentStep.rounds
-                                ? `Repite el bloque completo ${currentStep.rounds} veces`
-                                : "Repite el bloque completo"}, descansando entre series.
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <>
-                          {/* Main Name / Instruction */}
-                          <h3 className="text-xl sm:text-2xl font-black text-zinc-900 uppercase tracking-tight leading-snug max-w-2xl mx-auto">
-                            {currentStep.name}
-                          </h3>
+                      {/* Main Name / Instruction */}
+                      <h3 className="text-xl sm:text-2xl font-black text-zinc-900 uppercase tracking-tight leading-snug max-w-2xl mx-auto">
+                        {currentStep.name}
+                      </h3>
 
-                          {/* Series / Reps or Details Badge */}
-                          {currentStep.details ? (
-                            <div className="inline-flex flex-col items-center justify-center bg-zinc-50 border border-zinc-200/80 px-6 py-4 rounded-2xl mt-2">
-                              <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-wider mb-1 font-sans">
-                                Prescripción / Repeticiones
-                              </span>
-                              <span className="text-2xl sm:text-3xl font-black text-blue-600 font-mono tracking-wider">
-                                {currentStep.details}
-                              </span>
-                            </div>
-                          ) : currentStep.type === "mainWork" && (
-                            <div className="inline-flex flex-col items-center justify-center bg-zinc-50 border border-zinc-200/80 px-5 py-3 rounded-2xl mt-2">
-                              <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-wider mb-1 font-sans">
-                                Intensidad del Bloque
-                              </span>
-                              <span className="text-xs font-bold text-zinc-900 uppercase tracking-wider font-mono">
-                                {workoutToExecute.intensity || "Sostener esfuerzo"}
-                              </span>
-                            </div>
-                          )}
-                        </>
+                      {/* Series / Reps or Details Badge */}
+                      {currentStep.details ? (
+                        <div className="inline-flex flex-col items-center justify-center bg-zinc-50 border border-zinc-200/80 px-6 py-4 rounded-2xl mt-2">
+                          <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-wider mb-1 font-sans">
+                            Prescripción / Repeticiones
+                          </span>
+                          <span className="text-2xl sm:text-3xl font-black text-blue-600 font-mono tracking-wider">
+                            {currentStep.details}
+                          </span>
+                        </div>
+                      ) : currentStep.type === "mainWork" && (
+                        <div className="inline-flex flex-col items-center justify-center bg-zinc-50 border border-zinc-200/80 px-5 py-3 rounded-2xl mt-2">
+                          <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-wider mb-1 font-sans">
+                            Intensidad del Bloque
+                          </span>
+                          <span className="text-xs font-bold text-zinc-900 uppercase tracking-wider font-mono">
+                            {workoutToExecute.intensity || "Sostener esfuerzo"}
+                          </span>
+                        </div>
                       )}
 
                       {/* Checkmark showing if already completed during this session */}
@@ -1332,11 +1265,53 @@ export default function TodayWorkoutView({
                       </div>
                     </div>
 
+                    {session.isLongRun && (
+                      <div className="bg-blue-50/60 border border-blue-200 rounded-xl p-4 space-y-3">
+                        <p className="text-xs text-blue-900 font-medium leading-relaxed">
+                          Esta es tu tirada larga aeróbica. Registra el resultado real: la app la usará para recalcular tu predictor de marcas en el Perfil.
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block font-sans">Distancia recorrida (km)</label>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={actualDistanceKm}
+                              onChange={(e) => setActualDistanceKm(e.target.value.replace(/[^0-9.,]/g, ""))}
+                              placeholder="Ej. 8"
+                              className="w-full bg-white border border-zinc-200/80 rounded-lg px-3 py-2.5 text-xs text-zinc-900 focus:outline-none focus:border-blue-600 font-bold font-mono"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block font-sans">Tiempo total invertido (hh:mm:ss)</label>
+                            <input
+                              type="text"
+                              value={actualTime}
+                              onChange={(e) => setActualTime(e.target.value)}
+                              placeholder="Ej. 45:30"
+                              className="w-full bg-white border border-zinc-200/80 rounded-lg px-3 py-2.5 text-xs text-zinc-900 focus:outline-none focus:border-blue-600 font-bold font-mono"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex justify-end pt-2">
                       <button
                         type="button"
                         onClick={() => {
-                          onLogWorkoutCompletion(session.id, feedback, loggedRpe);
+                          const distNum = Number(actualDistanceKm.replace(",", "."));
+                          const timeSecs = parseTimeToSeconds(actualTime);
+                          const hasActualResult = session.isLongRun && distNum > 0 && timeSecs > 0;
+                          onLogWorkoutCompletion(
+                            session.id,
+                            feedback,
+                            loggedRpe,
+                            hasActualResult ? distNum : undefined,
+                            hasActualResult ? timeSecs : undefined
+                          );
+                          setActualDistanceKm("");
+                          setActualTime("");
                           setSelectedSessionId(defaultWorkout.id);
                           window.scrollTo({ top: 0, behavior: "smooth" });
                         }}

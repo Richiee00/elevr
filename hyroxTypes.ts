@@ -212,23 +212,6 @@ export interface HyroxWeeklyPlan {
   sessions: HyroxWorkoutSession[];
 }
 
-// Fase del plan (cerebro v3, Objetivo 1): determina el % de carga oficial usado y el sesgo de
-// dificultad. Independiente de isDescarga (una descarga puede caer dentro de cualquier fase).
-export type HyroxPhase = "base" | "desarrollo" | "especifica" | "carrera";
-
-// Cargas oficiales de competición por categoría (cerebro v3, bloque A). Wall Balls no escala el
-// peso del balón por fase (no existen balones fraccionarios): se usa el peso oficial siempre y en
-// su lugar se escalan las repeticiones por fase.
-export interface HyroxOfficialLoadRow {
-  sledPushKg: number;
-  sledPullKg: number;
-  farmersCarryKgPerHand: number;
-  sandbagLungesKg: number;
-  wallBallsKg: number;
-  wallBallsTargetM: number;
-  wallBallsReps: number;
-}
-
 export interface HyroxTrainingPlan {
   id: string;
   objective: HyroxObjective;
@@ -255,12 +238,6 @@ export interface HyroxTrainingPlan {
       agresivo?: string;
     };
     weakStations: HyroxStation[];
-    // Bloque F del cerebro v3 (Objetivo 1): rango de mejora esperado sobre estimatedFinishTime.realista
-    // según la frecuencia semanal, mostrado como expectativa, nunca como promesa.
-    expectedImprovement?: {
-      pct8Weeks: [number, number];
-      pct12Weeks: [number, number];
-    };
   };
   weeks: HyroxWeeklyPlan[];
 }

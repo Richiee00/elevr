@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { TrainingPlan, WorkoutSession, WeeklyPlan, DailyReadinessInput, DailyReadinessScore } from "./types";
-import { calculateReadiness, runDailyExecutionEngine, formatDateEU } from "./engines";
+import { TrainingPlan, WorkoutSession, WeeklyPlan, DailyReadinessInput, DailyReadinessScore, WorkoutCompletionRecord } from "./types";
+import { calculateReadiness, runDailyExecutionEngine, formatDateEU, parseTimeToSeconds } from "./engines";
 import { 
   Calendar, 
   Dumbbell, 
@@ -20,8 +20,10 @@ import {
   BrainCircuit,
   Smile,
   ArrowRight,
-  ArrowLeft
+  ArrowLeft,
+  Gauge
 } from "lucide-react";
+import AnalyzingDataScreen from "./AnalyzingDataScreen";
 
 function getSleepQualityColor(q: "bueno" | "normal" | "malo", isSelected: boolean): string {
   if (!isSelected) return "bg-white border-zinc-200 hover:border-zinc-300 text-zinc-700";
@@ -102,27 +104,18 @@ function parseExerciseDetails(exercise: string): { name: string; details: string
   return { name: exercise.trim(), details: "" };
 }
 
-// Separa "3x10" / "3x10 por lado" / "3x40s" en el número de series (rounds) y el resto de la
-// prescripción (reps). Ambos ejercicios de una biserie comparten el mismo número de series: se toma
-// el primero que aparezca en el bloque.
-function splitRoundsAndReps(details: string): { rounds: string | null; reps: string } {
-  const match = details.match(/^(\d+)\s*[x×*]\s*(.+)$/i);
-  if (match) {
-    return { rounds: match[1], reps: match[2].trim() };
-  }
-  return { rounds: null, reps: details };
-}
-
 interface WeeklyPlanViewProps {
   plan: TrainingPlan;
   currentWeekIndex: number;
   onSetCurrentWeek: (idx: number) => void;
-  onLogWorkoutCompletion: (workoutId: string, feedback: string, rpe: number) => void;
-  completedWorkouts: Record<string, { feedback: string; rpe: number; date: string }>;
+  onLogWorkoutCompletion: (workoutId: string, feedback: string, rpe: number, actualDistanceKm?: number, actualTimeSeconds?: number) => void;
+  completedWorkouts: Record<string, WorkoutCompletionRecord>;
   readiness?: DailyReadinessInput;
   onSaveReadiness?: (input: DailyReadinessInput) => void;
   activeInjury?: boolean;
   injuryAreas?: string[];
+  vamRequired?: boolean;
+  onGoToDiagnostico?: () => void;
 }
 
 export default function WeeklyPlanView({
@@ -134,13 +127,15 @@ export default function WeeklyPlanView({
   readiness,
   onSaveReadiness,
   activeInjury = false,
-  injuryAreas = []
+  injuryAreas = [],
+  vamRequired = false,
+  onGoToDiagnostico
 }: WeeklyPlanViewProps) {
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
   const [showExplanation, setShowExplanation] = useState<Record<string, boolean>>({});
   
   // Execution tracking state per session
-  const [sessionSteps, setSessionSteps] = useState<Record<string, "preview" | "adapted" | "executing" | "feedback">>({});
+  const [sessionSteps, setSessionSteps] = useState<Record<string, "preview" | "analyzing" | "adapted" | "executing" | "feedback">>({});
   const [activeExecutingSessionId, setActiveExecutingSessionId] = useState<string | null>(null);
   const [activeReadinessSessionId, setActiveReadinessSessionId] = useState<string | null>(null);
   const [currentExecIdx, setCurrentExecIdx] = useState<number>(0);
@@ -159,6 +154,8 @@ export default function WeeklyPlanView({
   // Feedback form states
   const [selectedFeedback, setSelectedFeedback] = useState<string>("adecuado");
   const [selectedRpe, setSelectedRpe] = useState<number>(5);
+  const [actualDistanceKm, setActualDistanceKm] = useState<string>("");
+  const [actualTime, setActualTime] = useState<string>("");
 
   const getLocalDateString = (dateInput: string | Date) => {
     const d = new Date(dateInput);
@@ -293,6 +290,7 @@ export default function WeeklyPlanView({
   };
 
   const toggleExpand = (sessionId: string) => {
+    if (vamRequired) return;
     if (expandedSessionId === sessionId) {
       setExpandedSessionId(null);
     } else {
@@ -321,13 +319,20 @@ export default function WeeklyPlanView({
       onSaveReadiness(input);
     }
 
-    setActiveExecutingSessionId(activeReadinessSessionId);
+    const sessionId = activeReadinessSessionId;
+    setActiveExecutingSessionId(sessionId);
     setCurrentExecIdx(0);
     setActiveCompletedSteps({});
     setSessionSteps(prev => ({
       ...prev,
-      [activeReadinessSessionId]: "adapted"
+      [sessionId]: "analyzing"
     }));
+    setTimeout(() => {
+      setSessionSteps(prev => ({
+        ...prev,
+        [sessionId]: "adapted"
+      }));
+    }, 2000);
 
     setActiveReadinessSessionId(null);
   };
@@ -340,7 +345,30 @@ export default function WeeklyPlanView({
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-12">
-      
+
+      {vamRequired && (
+        <div className="bg-blue-50/60 border border-blue-200 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-4 shadow-sm">
+          <div className="p-2.5 rounded-xl bg-blue-600 text-white shrink-0">
+            <Gauge className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <h4 className="text-sm font-bold uppercase tracking-wider text-zinc-900">Completa el Test VAM para ver el detalle</h4>
+            <p className="text-xs text-zinc-600 font-medium leading-relaxed mt-0.5">
+              De momento solo puedes ver los titulares de tu plan. Los ritmos y el detalle de cada sesión se desbloquean al completar el Test VAM en Diagnóstico.
+            </p>
+          </div>
+          {onGoToDiagnostico && (
+            <button
+              type="button"
+              onClick={onGoToDiagnostico}
+              className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase tracking-wider text-[11px] cursor-pointer transition shrink-0 whitespace-nowrap"
+            >
+              Ir a Diagnóstico
+            </button>
+          )}
+        </div>
+      )}
+
       {isExecutionActive ? (
         <div className="bg-white border border-zinc-200/80 rounded-2xl p-4 flex items-center justify-between shadow-sm">
           <button
@@ -499,10 +527,6 @@ export default function WeeklyPlanView({
             blockTitle?: string;
             originalIndex?: number;
             totalInPhase?: number;
-            // Solo para mainWork: la biserie completa del bloque, para mostrar todos sus ejercicios
-            // juntos en el mismo paso en vez de partirlos uno por pantalla.
-            exercises?: Array<{ name: string; reps: string }>;
-            rounds?: string | null;
           }> = [];
 
           if (workoutToExecute) {
@@ -528,26 +552,28 @@ export default function WeeklyPlanView({
             }
 
             if (workoutToExecute.mainWork) {
-              // Un paso por BLOQUE (biserie), no por ejercicio — así se ve que los ejercicios de un
-              // mismo bloque van seguidos y juntos forman una sola serie a repetir.
               const mainBlocks = parseMainWork(workoutToExecute.mainWork);
-
-              mainBlocks.forEach((block, idx) => {
-                const parsedExercises = block.exercises.map(ex => {
-                  const { name, details } = parseExerciseDetails(ex);
-                  return { name, ...splitRoundsAndReps(details) };
+              const mainWorkExercises: Array<{ name: string; details: string; blockTitle: string }> = [];
+              mainBlocks.forEach(block => {
+                block.exercises.forEach(ex => {
+                  const parsed = parseExerciseDetails(ex);
+                  mainWorkExercises.push({
+                    name: parsed.name,
+                    details: parsed.details,
+                    blockTitle: block.title
+                  });
                 });
-                const rounds = parsedExercises.find(e => e.rounds)?.rounds ?? null;
+              });
 
+              mainWorkExercises.forEach((ex, idx) => {
                 executionSteps.push({
                   type: "mainWork",
-                  title: `Trabajo Principal (${idx + 1}/${mainBlocks.length})`,
-                  name: block.title || `Bloque ${idx + 1}`,
-                  blockTitle: block.title,
-                  exercises: parsedExercises.map(e => ({ name: e.name, reps: e.reps })),
-                  rounds,
+                  title: `Trabajo Principal (${idx + 1}/${mainWorkExercises.length})`,
+                  name: ex.name,
+                  details: ex.details,
+                  blockTitle: ex.blockTitle,
                   originalIndex: idx,
-                  totalInPhase: mainBlocks.length
+                  totalInPhase: mainWorkExercises.length
                 });
               });
             }
@@ -605,9 +631,9 @@ export default function WeeklyPlanView({
               }`}
             >
               {/* Day Header */}
-              <div 
+              <div
                 onClick={() => toggleExpand(session.id)}
-                className="p-4 sm:p-5 flex items-center justify-between gap-4 cursor-pointer select-none"
+                className={`p-4 sm:p-5 flex items-center justify-between gap-4 select-none ${vamRequired ? "cursor-default" : "cursor-pointer"}`}
               >
                 <div className="flex items-center gap-4 min-w-0">
                   <div className="text-left">
@@ -622,11 +648,6 @@ export default function WeeklyPlanView({
                   <div className="min-w-0">
                     <div className="flex items-center flex-wrap gap-2 mb-1">
                       {getSessionTypeBadge(session.type)}
-                      {session.isVamRetest && !isCompleted && (
-                        <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-[8px] font-bold rounded-md uppercase tracking-wider border border-amber-200">
-                          Test VAM
-                        </span>
-                      )}
                       {isCompleted && (
                         <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[8px] font-bold rounded-md uppercase tracking-wider flex items-center gap-0.5 border border-emerald-200">
                           <CheckCircle className="w-2.5 h-2.5" /> Completado
@@ -650,15 +671,21 @@ export default function WeeklyPlanView({
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {!isCompleted && session.type !== "descanso" && (
-                    <span className="hidden sm:inline-block text-[9px] font-bold uppercase tracking-wider text-zinc-400">
-                      Ver detalles
-                    </span>
-                  )}
-                  {isExpanded ? (
-                    <ChevronDown className="w-5 h-5 text-zinc-400" />
+                  {vamRequired ? (
+                    <Lock className="w-4 h-4 text-zinc-300" />
                   ) : (
-                    <ChevronRight className="w-5 h-5 text-zinc-400" />
+                    <>
+                      {!isCompleted && session.type !== "descanso" && (
+                        <span className="hidden sm:inline-block text-[9px] font-bold uppercase tracking-wider text-zinc-400">
+                          Ver detalles
+                        </span>
+                      )}
+                      {isExpanded ? (
+                        <ChevronDown className="w-5 h-5 text-zinc-400" />
+                      ) : (
+                        <ChevronRight className="w-5 h-5 text-zinc-400" />
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -849,6 +876,9 @@ export default function WeeklyPlanView({
                         </div>
                       )}
 
+                      {/* STEP 1.5: ANALYZING TRANSITION */}
+                      {currentStep === "analyzing" && <AnalyzingDataScreen />}
+
                       {/* STEP 2: ADAPTED VIEW */}
                       {currentStep === "adapted" && (
                         <div className="space-y-6">
@@ -899,19 +929,6 @@ export default function WeeklyPlanView({
                                   <p className="text-xs text-zinc-600 font-medium leading-relaxed max-w-2xl font-sans">
                                     {sessionAdaptationResult.justification}
                                   </p>
-                                </div>
-
-                                <div className="flex flex-col items-start sm:items-end gap-1 shrink-0 font-mono">
-                                  <span className="text-[9px] text-zinc-400 uppercase font-bold tracking-wider">Riesgo de Lesión</span>
-                                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
-                                    sessionAdaptationResult.injuryRisk === "Bajo" 
-                                      ? "bg-emerald-100 text-emerald-800 border border-emerald-200" 
-                                      : sessionAdaptationResult.injuryRisk === "Moderado" 
-                                        ? "bg-amber-100 text-amber-800 border border-amber-200" 
-                                        : "bg-rose-100 text-rose-800 border border-rose-200 animate-pulse"
-                                  }`}>
-                                    {sessionAdaptationResult.injuryRisk}
-                                  </span>
                                 </div>
                               </div>
 
@@ -1150,78 +1167,30 @@ export default function WeeklyPlanView({
                                 </span>
                               </div>
 
-                              {activeExecStep.type === "mainWork" && activeExecStep.exercises && activeExecStep.exercises.length > 0 ? (
-                                // Bloque completo (biserie): todos sus ejercicios se muestran juntos,
-                                // en el orden en que hay que hacerlos, con las series a repetir.
-                                <div className="space-y-4">
-                                  {activeExecStep.rounds && (
-                                    <div className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider">
-                                      {activeExecStep.rounds} Series
-                                    </div>
-                                  )}
-                                  <h3 className="text-lg sm:text-xl font-black text-zinc-900 uppercase tracking-tight leading-snug max-w-2xl mx-auto">
-                                    {activeExecStep.name}
-                                  </h3>
-                                  <div className="max-w-md mx-auto space-y-2 text-left">
-                                    {activeExecStep.exercises.map((ex, exIdx) => (
-                                      <React.Fragment key={exIdx}>
-                                        <div className="flex items-center gap-3 bg-zinc-50 border border-zinc-200/80 rounded-xl px-4 py-3">
-                                          <span className="shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-black flex items-center justify-center">
-                                            {exIdx + 1}
-                                          </span>
-                                          <div className="min-w-0">
-                                            <p className="text-sm font-bold text-zinc-900 truncate">{ex.name}</p>
-                                            {ex.reps && (
-                                              <p className="text-xs font-mono font-bold text-blue-600">{ex.reps}</p>
-                                            )}
-                                          </div>
-                                        </div>
-                                        {activeExecStep.exercises && exIdx < activeExecStep.exercises.length - 1 && (
-                                          <div className="flex items-center justify-center gap-1 text-[9px] font-bold uppercase tracking-wider text-zinc-400 py-0.5">
-                                            ↓ luego, sin descanso
-                                          </div>
-                                        )}
-                                      </React.Fragment>
-                                    ))}
-                                  </div>
-                                  {activeExecStep.exercises.length > 1 && (
-                                    <p className="text-[11px] text-zinc-500 font-medium leading-relaxed max-w-md mx-auto">
-                                      Haz estos {activeExecStep.exercises.length} ejercicios seguidos, en este orden: eso es{" "}
-                                      <strong className="text-zinc-900">1 serie</strong>.{" "}
-                                      {activeExecStep.rounds
-                                        ? `Repite el bloque completo ${activeExecStep.rounds} veces`
-                                        : "Repite el bloque completo"}, descansando entre series.
-                                    </p>
-                                  )}
-                                </div>
-                              ) : (
-                                <>
-                                  {/* Main Name / Instruction */}
-                                  <h3 className="text-xl sm:text-2xl font-black text-zinc-900 uppercase tracking-tight leading-snug max-w-2xl mx-auto">
-                                    {activeExecStep.name}
-                                  </h3>
+                              {/* Main Name / Instruction */}
+                              <h3 className="text-xl sm:text-2xl font-black text-zinc-900 uppercase tracking-tight leading-snug max-w-2xl mx-auto">
+                                {activeExecStep.name}
+                              </h3>
 
-                                  {/* Details */}
-                                  {activeExecStep.details ? (
-                                    <div className="inline-flex flex-col items-center justify-center bg-zinc-50 border border-zinc-200/80 px-6 py-4 rounded-2xl mt-2">
-                                      <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-wider mb-1 font-sans">
-                                        Prescripción / Repeticiones
-                                      </span>
-                                      <span className="text-2xl sm:text-3xl font-black text-blue-600 font-mono tracking-wider">
-                                        {activeExecStep.details}
-                                      </span>
-                                    </div>
-                                  ) : activeExecStep.type === "mainWork" && (
-                                    <div className="inline-flex flex-col items-center justify-center bg-zinc-50 border border-zinc-200/80 px-5 py-3 rounded-2xl mt-2">
-                                      <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-wider mb-1 font-sans">
-                                        Intensidad del Bloque
-                                      </span>
-                                      <span className="text-xs font-bold text-zinc-900 uppercase tracking-wider font-mono">
-                                        {workoutToExecute.intensity || "Sostener esfuerzo"}
-                                      </span>
-                                    </div>
-                                  )}
-                                </>
+                              {/* Details */}
+                              {activeExecStep.details ? (
+                                <div className="inline-flex flex-col items-center justify-center bg-zinc-50 border border-zinc-200/80 px-6 py-4 rounded-2xl mt-2">
+                                  <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-wider mb-1 font-sans">
+                                    Prescripción / Repeticiones
+                                  </span>
+                                  <span className="text-2xl sm:text-3xl font-black text-blue-600 font-mono tracking-wider">
+                                    {activeExecStep.details}
+                                  </span>
+                                </div>
+                              ) : activeExecStep.type === "mainWork" && (
+                                <div className="inline-flex flex-col items-center justify-center bg-zinc-50 border border-zinc-200/80 px-5 py-3 rounded-2xl mt-2">
+                                  <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-wider mb-1 font-sans">
+                                    Intensidad del Bloque
+                                  </span>
+                                  <span className="text-xs font-bold text-zinc-900 uppercase tracking-wider font-mono">
+                                    {workoutToExecute.intensity || "Sostener esfuerzo"}
+                                  </span>
+                                </div>
                               )}
 
                               {activeCompletedSteps[currentExecIdx] && (
@@ -1312,11 +1281,53 @@ export default function WeeklyPlanView({
                               </div>
                             </div>
 
+                            {session.isLongRun && (
+                              <div className="bg-blue-50/60 border border-blue-200 rounded-xl p-4 space-y-3">
+                                <p className="text-xs text-blue-900 font-medium leading-relaxed">
+                                  Esta es tu tirada larga aeróbica. Registra el resultado real: la app la usará para recalcular tu predictor de marcas en el Perfil.
+                                </p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                  <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block font-sans">Distancia recorrida (km)</label>
+                                    <input
+                                      type="text"
+                                      inputMode="decimal"
+                                      value={actualDistanceKm}
+                                      onChange={(e) => setActualDistanceKm(e.target.value.replace(/[^0-9.,]/g, ""))}
+                                      placeholder="Ej. 8"
+                                      className="w-full bg-white border border-zinc-200/80 rounded-lg px-3 py-2.5 text-xs text-zinc-900 focus:outline-none focus:border-blue-600 font-bold font-mono"
+                                    />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block font-sans">Tiempo total invertido (hh:mm:ss)</label>
+                                    <input
+                                      type="text"
+                                      value={actualTime}
+                                      onChange={(e) => setActualTime(e.target.value)}
+                                      placeholder="Ej. 45:30"
+                                      className="w-full bg-white border border-zinc-200/80 rounded-lg px-3 py-2.5 text-xs text-zinc-900 focus:outline-none focus:border-blue-600 font-bold font-mono"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
                             <div className="flex justify-end pt-2">
                               <button
                                 type="button"
                                 onClick={() => {
-                                  onLogWorkoutCompletion(session.id, selectedFeedback, selectedRpe);
+                                  const distNum = Number(actualDistanceKm.replace(",", "."));
+                                  const timeSecs = parseTimeToSeconds(actualTime);
+                                  const hasActualResult = session.isLongRun && distNum > 0 && timeSecs > 0;
+                                  onLogWorkoutCompletion(
+                                    session.id,
+                                    selectedFeedback,
+                                    selectedRpe,
+                                    hasActualResult ? distNum : undefined,
+                                    hasActualResult ? timeSecs : undefined
+                                  );
+                                  setActualDistanceKm("");
+                                  setActualTime("");
                                   setSessionSteps(prev => ({ ...prev, [session.id]: "preview" }));
                                   setActiveExecutingSessionId(null);
                                 }}

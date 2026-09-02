@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { HyroxTrainingPlan, HyroxCategory, HyroxOnboardingData } from "./hyroxTypes";
+import { HyroxTrainingPlan, HyroxCategory } from "./hyroxTypes";
 import { CATEGORY_LABELS } from "./hyroxLibrary";
 import { resolveHyroxSessionTemplate } from "./hyroxEngine";
 import { formatDateEU } from "./engines";
@@ -7,8 +7,6 @@ import { ChevronLeft, ChevronRight, CalendarCheck2, CheckCircle2 } from "lucide-
 
 interface HyroxCalendarViewProps {
   plan: HyroxTrainingPlan;
-  onboarding: HyroxOnboardingData | null;
-  vamKmH?: number;
   completedWorkouts: Record<string, { feedback: string; rpe: number; date: string }>;
 }
 
@@ -21,7 +19,7 @@ const CATEGORY_DOT: Record<HyroxCategory, string> = {
 
 const MONTH_NAMES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
-export default function HyroxCalendarView({ plan, onboarding, vamKmH, completedWorkouts }: HyroxCalendarViewProps) {
+export default function HyroxCalendarView({ plan, completedWorkouts }: HyroxCalendarViewProps) {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedDayStr, setSelectedDayStr] = useState<string | null>(new Date().toISOString().split("T")[0]);
 
@@ -51,8 +49,7 @@ export default function HyroxCalendarView({ plan, onboarding, vamKmH, completedW
     const dayIdx = diffDays % 7;
     const week = plan.weeks[weekIdx];
     if (!week) return null;
-    const session = week.sessions[dayIdx];
-    return session ? { session, weekNumber: week.weekNumber } : null;
+    return week.sessions[dayIdx] || null;
   };
 
   const calendarData = useMemo(() => {
@@ -74,13 +71,8 @@ export default function HyroxCalendarView({ plan, onboarding, vamKmH, completedW
     return rows;
   }, [currentDate]);
 
-  const selectedSessionInfo = selectedDayStr ? getSessionForDate(new Date(selectedDayStr)) : null;
-  const selectedSession = selectedSessionInfo?.session ?? null;
-  const selectedTemplate = selectedSessionInfo && onboarding
-    ? resolveHyroxSessionTemplate(selectedSessionInfo.session, { onboarding, weekNumber: selectedSessionInfo.weekNumber, durationWeeks: plan.durationWeeks, vamKmH })
-    : selectedSession
-      ? resolveHyroxSessionTemplate(selectedSession)
-      : undefined;
+  const selectedSession = selectedDayStr ? getSessionForDate(new Date(selectedDayStr)) : null;
+  const selectedTemplate = selectedSession ? resolveHyroxSessionTemplate(selectedSession) : undefined;
   const selectedCompleted = selectedSession ? completedWorkouts[selectedSession.id] : undefined;
 
   return (
@@ -143,8 +135,8 @@ export default function HyroxCalendarView({ plan, onboarding, vamKmH, completedW
                   const dateStr = getLocalDateString(date);
                   const isSelected = selectedDayStr === dateStr;
                   const isToday = getLocalDateString(new Date()) === dateStr;
-                  const sessionInfo = getSessionForDate(date);
-                  const isCompleted = sessionInfo ? !!completedWorkouts[sessionInfo.session.id] : false;
+                  const session = getSessionForDate(date);
+                  const isCompleted = session ? !!completedWorkouts[session.id] : false;
 
                   return (
                     <button
@@ -162,8 +154,8 @@ export default function HyroxCalendarView({ plan, onboarding, vamKmH, completedW
                     >
                       <span className="text-[10px] font-bold">{date.getDate()}</span>
                       <div className="flex items-center gap-0.5">
-                        {sessionInfo && sessionInfo.session.category !== "descanso" && (
-                          <span className={`w-1.5 h-1.5 rounded-full ${CATEGORY_DOT[sessionInfo.session.category]}`} />
+                        {session && session.category !== "descanso" && (
+                          <span className={`w-1.5 h-1.5 rounded-full ${CATEGORY_DOT[session.category]}`} />
                         )}
                         {isCompleted && <CheckCircle2 className={`w-2.5 h-2.5 ${isSelected ? "text-white" : "text-emerald-600"}`} />}
                       </div>

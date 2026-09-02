@@ -51,9 +51,7 @@ export default function HyroxApp({ onSwitchDiscipline, onResetToLanding }: Hyrox
   };
 
   const handleUpdateProfile = (data: HyroxOnboardingData) => {
-    // Si ya existe un Test VAM, lo reutilizamos: editar el perfil no debe hacer que el plan vuelva a
-    // la tabla genérica de debutantes.
-    const newPlan = generateHyroxPlan(data, vamTest?.vamKmH);
+    const newPlan = generateHyroxPlan(data);
     setOnboarding(data);
     setPlan(newPlan);
     localStorage.setItem("hyrox_plan_onboarding", JSON.stringify(data));
@@ -168,7 +166,7 @@ export default function HyroxApp({ onSwitchDiscipline, onResetToLanding }: Hyrox
                 plan={plan}
                 activeInjury={onboarding?.activeInjury || false}
                 injuryAreas={onboarding?.injuryAreas || []}
-                completedWorkoutsCount={Object.keys(completedWorkouts).length}
+                completedWorkouts={completedWorkouts}
                 vamTest={vamTest}
                 onSaveVAMTest={handleSaveVAMTest}
               />
@@ -180,7 +178,6 @@ export default function HyroxApp({ onSwitchDiscipline, onResetToLanding }: Hyrox
               <HyroxTodayWorkoutView
                 plan={plan}
                 onboarding={onboarding}
-                vamKmH={vamTest?.vamKmH}
                 currentWeekIndex={currentWeekIndex}
                 readiness={todayReadiness}
                 onSaveReadiness={handleSaveReadiness}
@@ -194,8 +191,6 @@ export default function HyroxApp({ onSwitchDiscipline, onResetToLanding }: Hyrox
             <motion.div key="plan" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
               <HyroxWeeklyPlanView
                 plan={plan}
-                onboarding={onboarding}
-                vamKmH={vamTest?.vamKmH}
                 currentWeekIndex={currentWeekIndex}
                 onSetCurrentWeek={handleSetCurrentWeekIndex}
                 onLogWorkoutCompletion={handleLogWorkoutCompletion}
@@ -208,7 +203,7 @@ export default function HyroxApp({ onSwitchDiscipline, onResetToLanding }: Hyrox
 
           {activeTab === "calendar" && plan && (
             <motion.div key="calendar" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-              <HyroxCalendarView plan={plan} onboarding={onboarding} vamKmH={vamTest?.vamKmH} completedWorkouts={completedWorkouts} />
+              <HyroxCalendarView plan={plan} completedWorkouts={completedWorkouts} />
             </motion.div>
           )}
 
