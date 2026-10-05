@@ -4,219 +4,308 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Poso · Jabón de café</title>
-<meta name="description" content="Grano: jabón artesanal con forma de grano de café, hecho con el café molido que sobra en las cafeterías.">
+<meta name="description" content="Grano: jabón artesanal con forma de grano de café, hecho con el café molido que sobra en las cafeterías de tu barrio.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Hanken+Grotesk:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gloock&family=Figtree:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: quiet product page in the manner of an apothecary catalogue; the 3D soap sits in a large studio panel, everything else is set on a 12-column grid with hairline rules. */
+/* Layout: espresso-dark editorial page; the rotatable 3D soap anchors the hero, sections alternate text/visual and collapse to one column. */
 :root {
-  --bg: #f4f3f0;
-  --surface: #eae7e2;
-  --fg: #1f1b18;
-  --muted: #6d655e;
-  --line: #d8d2cb;
-  --accent: #5b3a26;
-  --accent-ink: #fbf9f6;
-  --stage-hi: #fbfaf8;
-  --stage-lo: #e2ddd6;
-  --font-display: "Cormorant Garamond", "Iowan Old Style", Georgia, serif;
-  --font-body: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --step--1: 0.8125rem;
-  --step-0: 1rem;
-  --step-1: 1.1875rem;
-  --step-2: clamp(1.6rem, 1.3rem + 1vw, 2.1rem);
-  --step-3: clamp(2.2rem, 1.6rem + 2.4vw, 3.4rem);
-  --step-4: clamp(2.8rem, 1.8rem + 4vw, 5rem);
-  --gutter: clamp(16px, 4vw, 56px);
+  --bg: #1a110c;          /* espresso */
+  --surface: #251812;     /* tostado */
+  --surface-2: #33221a;
+  --fg: #f0e4d4;          /* espuma de leche */
+  --muted: #b09a86;
+  --line: #4a3428;
+  --accent: #d59a57;      /* crema del espresso */
+  --accent-ink: #1a110c;
+  --leaf: #8fae7e;        /* hoja del cafeto */
+  --glow: rgba(213, 154, 87, 0.22);
+  --bean-hi: #c99872;
+  --bean-mid: #8a5a3b;
+  --bean-lo: #3f2517;
+  --bean-crease: #2a170e;
+  --font-display: "Gloock", "Iowan Old Style", Georgia, serif;
+  --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --step--1: clamp(0.8rem, 0.78rem + 0.1vw, 0.875rem);
+  --step-0: clamp(1rem, 0.96rem + 0.2vw, 1.125rem);
+  --step-1: clamp(1.25rem, 1.15rem + 0.5vw, 1.5rem);
+  --step-2: clamp(1.6rem, 1.35rem + 1.2vw, 2.25rem);
+  --step-3: clamp(2.2rem, 1.6rem + 3vw, 4rem);
+  --step-4: clamp(3rem, 1.8rem + 6vw, 6.5rem);
+  --radius: 14px;
+  --gutter: clamp(16px, 4vw, 48px);
+  color-scheme: dark;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #141110; --surface: #1d1917; --fg: #ece6df; --muted: #a1968c; --line: #342d29;
-    --accent: #c79a72; --accent-ink: #141110; --stage-hi: #2b2522; --stage-lo: #171312;
-    color-scheme: dark;
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f3ece4; --surface: #e8ddd0; --surface-2: #dccdbd; --fg: #24160e; --muted: #6e5847;
+    --line: #cdb9a5; --accent: #a8642a; --accent-ink: #fff8f0; --leaf: #4f7343; --glow: rgba(168, 100, 42, 0.16);
+    --bean-hi: #b9845c; --bean-mid: #7a4b2e; --bean-lo: #3a2214; --bean-crease: #24130a;
+    color-scheme: light;
   }
 }
-:root[data-theme="dark"] {
-  --bg: #141110; --surface: #1d1917; --fg: #ece6df; --muted: #a1968c; --line: #342d29;
-  --accent: #c79a72; --accent-ink: #141110; --stage-hi: #2b2522; --stage-lo: #171312;
-  color-scheme: dark;
+:root[data-theme="light"] {
+  --bg: #f3ece4; --surface: #e8ddd0; --surface-2: #dccdbd; --fg: #24160e; --muted: #6e5847;
+  --line: #cdb9a5; --accent: #a8642a; --accent-ink: #fff8f0; --leaf: #4f7343; --glow: rgba(168, 100, 42, 0.16);
+  --bean-hi: #b9845c; --bean-mid: #7a4b2e; --bean-lo: #3a2214; --bean-crease: #24130a;
+  color-scheme: light;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
 [hidden] { display: none !important; }
+html { scroll-behavior: smooth; }
 body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-body);
   font-size: var(--step-0);
-  line-height: 1.65;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
+img, svg { max-width: 100%; }
 a { color: inherit; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-h1, h2, h3 { font-family: var(--font-display); font-weight: 500; line-height: 1.05; margin: 0; text-wrap: balance; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 400; line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
 p { margin: 0; }
-.wrap { width: 100%; max-width: 1280px; margin-inline: auto; padding-inline: var(--gutter); }
-.label { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
-.num { font-variant-numeric: tabular-nums; }
+.wrap { width: 100%; max-width: 1240px; margin-inline: auto; padding-inline: var(--gutter); }
+.eyebrow { font-family: var(--font-mono); font-size: var(--step--1); letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
 
-/* Nav */
-.nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); border-bottom: 1px solid var(--line); }
-.nav .wrap { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-block: 16px; }
-.logo { font-family: var(--font-display); font-size: 1.6rem; font-weight: 600; letter-spacing: 0.22em; text-decoration: none; }
-.nav ul { display: flex; gap: 32px; list-style: none; margin: 0; padding: 0; font-size: var(--step--1); }
+/* ---------- Nav ---------- */
+.nav {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+}
+.nav .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 14px; }
+.logo { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-size: 1.6rem; text-decoration: none; }
+.logo svg { width: 22px; height: 28px; }
+.nav ul { display: flex; gap: clamp(14px, 2.5vw, 32px); list-style: none; margin: 0; padding: 0; font-size: var(--step--1); }
 .nav ul a { text-decoration: none; color: var(--muted); }
 .nav ul a:hover { color: var(--fg); }
-@media (max-width: 760px) { .nav ul { display: none; } }
+@media (max-width: 720px) { .nav ul { display: none; } }
 
 .btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
-  font: 600 var(--step--1)/1 var(--font-body); letter-spacing: 0.06em; text-transform: uppercase;
-  padding: 15px 26px; border: 1px solid var(--fg); text-decoration: none; cursor: pointer;
-  background: transparent; color: var(--fg);
+  display: inline-flex; align-items: center; gap: 10px;
+  font: 600 var(--step--1)/1 var(--font-body); letter-spacing: 0.02em;
+  padding: 14px 22px; border-radius: 999px; border: 1px solid transparent;
+  text-decoration: none; cursor: pointer;
 }
-.btn:hover { background: var(--fg); color: var(--bg); }
-.btn-solid { background: var(--fg); color: var(--bg); }
-.btn-solid:hover { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn-primary { background: var(--accent); color: var(--accent-ink); }
+.btn-primary:hover { background: var(--fg); color: var(--bg); }
+.btn-ghost { border-color: var(--line); color: var(--fg); background: transparent; }
+.btn-ghost:hover { border-color: var(--accent); }
 
-/* Hero */
-.hero { padding-block: clamp(32px, 5vw, 64px) clamp(56px, 8vw, 104px); }
-.hero .wrap { display: grid; grid-template-columns: 5fr 7fr; gap: clamp(32px, 5vw, 80px); align-items: center; }
-.hero-copy { display: grid; gap: 26px; min-width: 0; }
-.hero h1 { font-size: var(--step-4); letter-spacing: -0.01em; }
-.hero .lede { max-width: 42ch; color: var(--muted); font-size: var(--step-1); line-height: 1.55; }
-.ctas { display: flex; flex-wrap: wrap; gap: 12px; }
-.facts { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); margin: 8px 0 0; }
-.facts div { padding-top: 16px; display: grid; gap: 2px; }
-.facts dt { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
-.facts dd { margin: 0; font-family: var(--font-display); font-size: var(--step-2); font-variant-numeric: tabular-nums; }
+/* ---------- Hero ---------- */
+.hero { padding-block: clamp(32px, 6vw, 80px) clamp(56px, 8vw, 112px); }
+.hero .wrap { display: grid; grid-template-columns: 1fr 1.1fr; align-items: center; gap: clamp(24px, 5vw, 72px); }
+.hero-copy { display: grid; gap: 28px; min-width: 0; }
+.hero h1 { font-size: var(--step-4); }
+.hero h1 em { font-style: italic; color: var(--accent); }
+.hero .lede { max-width: 46ch; color: var(--muted); font-size: var(--step-1); line-height: 1.5; }
+.hero .ctas { display: flex; flex-wrap: wrap; gap: 12px; }
+.hero-meta { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: var(--step--1); color: var(--muted); }
+.hero-meta span { display: inline-flex; align-items: center; gap: 8px; }
+.hero-meta span::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--leaf); }
 
 /* 3D viewer */
 .viewer {
-  position: relative; aspect-ratio: 1 / 1; max-width: 100%;
-  background: radial-gradient(ellipse 70% 60% at 50% 42%, var(--stage-hi), var(--stage-lo));
-  border: 1px solid var(--line);
+  position: relative; margin: 0; aspect-ratio: 1 / 1; width: 100%; max-width: 100%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--glow), transparent 75%);
 }
 .viewer canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: pan-y; }
 .viewer canvas:active { cursor: grabbing; }
-.viewer-top, .viewer-bottom { position: absolute; left: 20px; right: 20px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; pointer-events: none; }
-.viewer-top { top: 18px; }
-.viewer-bottom { bottom: 18px; }
-.viewer-top .label { display: inline-flex; align-items: center; gap: 8px; }
-.viewer-top svg { width: 16px; height: 16px; }
-.views { display: flex; border: 1px solid var(--line); background: var(--bg); pointer-events: auto; }
+.viewer-hint {
+  position: absolute; top: 4%; left: 50%; transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; pointer-events: none;
+  font: 500 0.75rem/1 var(--font-mono); color: var(--muted);
+}
+.viewer-hint svg { width: 14px; height: 14px; }
+.views {
+  position: absolute; bottom: 2%; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 4px; padding: 4px; border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent); border: 1px solid var(--line);
+}
 .views button {
-  font: 500 0.75rem/1 var(--font-body); letter-spacing: 0.08em; text-transform: uppercase;
-  padding: 10px 14px; border: 0; background: transparent; color: var(--muted); cursor: pointer;
+  font: 500 0.75rem/1 var(--font-mono); letter-spacing: 0.04em;
+  padding: 9px 14px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer;
 }
-.views button + button { border-left: 1px solid var(--line); }
-.views button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.views button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 .views button:hover:not([aria-pressed="true"]) { color: var(--fg); }
-.dims { font-size: 0.75rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .viewer-fallback { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--muted); }
-@media (max-width: 900px) {
+@media (max-width: 860px) {
   .hero .wrap { grid-template-columns: 1fr; }
-  .viewer { order: -1; }
-}
-@media (max-width: 480px) {
-  .facts { grid-template-columns: 1fr 1fr; }
-  .facts div:last-child { grid-column: span 2; }
-  .viewer-bottom { left: 12px; right: 12px; }
-  .views button { padding: 9px 10px; }
+  .viewer { order: -1; width: min(460px, 100%); justify-self: center; }
 }
 
-/* Sections */
-section { padding-block: clamp(64px, 9vw, 120px); border-top: 1px solid var(--line); }
-.head { display: grid; grid-template-columns: 5fr 7fr; gap: clamp(24px, 5vw, 80px); margin-bottom: clamp(40px, 5vw, 64px); align-items: end; }
-.head > div { display: grid; gap: 16px; min-width: 0; }
-.head h2 { font-size: var(--step-3); }
-.head p { color: var(--muted); max-width: 56ch; }
-@media (max-width: 860px) { .head { grid-template-columns: 1fr; } }
+/* ---------- Band ---------- */
+.band { border-block: 1px solid var(--line); background: var(--surface); padding-block: 18px; }
+.band .wrap { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 36px; font-family: var(--font-display); font-size: var(--step-1); }
+.band span { display: inline-flex; align-items: center; gap: 36px; }
+.band span + span::before { content: ""; width: 10px; height: 13px; border-radius: 50%; background: var(--accent); transform: rotate(-20deg); box-shadow: inset -2px 0 0 var(--bean-crease); }
+.band i { color: var(--muted); }
+
+/* ---------- Sections ---------- */
+section { padding-block: clamp(72px, 10vw, 140px); }
+.section-head { display: grid; gap: 18px; max-width: 760px; margin-bottom: clamp(40px, 6vw, 72px); }
+.section-head h2 { font-size: var(--step-3); }
+.section-head p { color: var(--muted); max-width: 60ch; }
 
 /* Problem */
-.problem .wrap { display: grid; grid-template-columns: 5fr 7fr; gap: clamp(24px, 5vw, 80px); }
-.problem .figure { font-family: var(--font-display); font-size: clamp(4.5rem, 3rem + 6vw, 8rem); line-height: .9; color: var(--accent); font-variant-numeric: tabular-nums; }
-.problem .figure-cap { margin-top: 12px; color: var(--muted); font-size: var(--step--1); max-width: 30ch; }
-.problem-copy { display: grid; gap: 20px; align-content: start; min-width: 0; }
-.problem-copy h2 { font-size: var(--step-3); }
-.problem-copy p { color: var(--muted); max-width: 58ch; }
-@media (max-width: 860px) { .problem .wrap { grid-template-columns: 1fr; } }
+.problem .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(32px, 6vw, 96px); align-items: end; }
+.big-number { font-family: var(--font-display); font-size: clamp(4.5rem, 2.5rem + 8vw, 9rem); line-height: .85; color: var(--accent); font-variant-numeric: tabular-nums; }
+.big-number small { font-size: .32em; color: var(--fg); margin-left: .1em; }
+.big-cap { margin-top: 14px; color: var(--muted); font-size: var(--step--1); max-width: 30ch; }
+.problem-copy { display: grid; gap: 20px; min-width: 0; }
+.problem-copy h2 { font-size: var(--step-2); }
+.problem-copy .lead { font-size: var(--step-1); line-height: 1.5; max-width: 36ch; }
+.problem-copy .note { color: var(--muted); font-size: var(--step--1); max-width: 48ch; }
+@media (max-width: 760px) { .problem .wrap { grid-template-columns: 1fr; } }
 
 /* Process */
-.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--fg); }
-.step { padding: 22px 24px 0 0; display: grid; gap: 10px; align-content: start; min-width: 0; }
-.step .n { font-size: var(--step--1); color: var(--muted); font-variant-numeric: tabular-nums; }
-.step h3 { font-size: var(--step-2); }
-.step p { color: var(--muted); font-size: 0.9375rem; }
-.step .spec { font-size: 0.75rem; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
-@media (max-width: 1000px) { .steps { grid-template-columns: 1fr 1fr; row-gap: 32px; } }
-@media (max-width: 560px) { .steps { grid-template-columns: 1fr; } .step { padding-right: 0; } }
+.process { background: var(--surface); }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); position: relative; }
+.steps::before { content: ""; position: absolute; top: 27px; left: 0; right: 0; height: 1px; background: var(--accent); }
+.step { position: relative; padding-right: 20px; display: grid; gap: 14px; align-content: start; min-width: 0; }
+.step .dot {
+  width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--bg); border: 1px solid var(--accent); position: relative; z-index: 1;
+  font-family: var(--font-mono); font-size: .8rem; color: var(--accent);
+}
+.step h3 { font-size: var(--step-1); line-height: 1.15; }
+.step p { color: var(--muted); font-size: var(--step--1); line-height: 1.55; }
+.step .spec { font-family: var(--font-mono); font-size: .75rem; color: var(--leaf); letter-spacing: .04em; }
+@media (max-width: 960px) {
+  .steps { grid-template-columns: 1fr; gap: 28px; }
+  .steps::before { left: 27px; right: auto; top: 0; bottom: 0; width: 1px; height: auto; }
+  .step { grid-template-columns: 54px 1fr; column-gap: 20px; padding-right: 0; }
+  .step .dot { grid-row: span 3; }
+}
 
-/* Product details */
-.details .wrap { display: grid; grid-template-columns: 5fr 7fr; gap: clamp(24px, 5vw, 80px); }
-.details-intro { display: grid; gap: 18px; align-content: start; min-width: 0; }
-.details-intro h2 { font-size: var(--step-3); }
-.details-intro p { color: var(--muted); max-width: 46ch; }
-.spec-table { margin: 0; display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--fg); }
-.spec-table div { padding-block: 18px; border-bottom: 1px solid var(--line); display: grid; gap: 4px; }
-.spec-table div:nth-child(odd) { padding-right: 24px; }
-.spec-table dt { font-size: 0.72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
-.spec-table dd { margin: 0; font-family: var(--font-display); font-size: var(--step-2); font-variant-numeric: tabular-nums; }
-.spec-table div.wide { grid-column: 1 / -1; padding-right: 0; }
-.spec-table div.wide dd { font-family: var(--font-body); font-size: 0.8125rem; line-height: 1.7; color: var(--muted); }
-@media (max-width: 860px) { .details .wrap { grid-template-columns: 1fr; } }
+/* Product */
+.product .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(32px, 6vw, 96px); align-items: center; }
+.product-visual { position: relative; aspect-ratio: 1; width: 100%; max-width: 100%; border-radius: 50%; background: radial-gradient(circle at 50% 45%, var(--surface-2), var(--bg) 70%); display: grid; place-items: center; }
+.product-visual img { width: 100%; height: 100%; object-fit: contain; }
+.ring { position: absolute; inset: 6%; border: 1px dashed var(--line); border-radius: 50%; pointer-events: none; }
+.hotspot {
+  position: absolute; width: 30px; height: 30px; border-radius: 50%; border: 0; padding: 0; cursor: pointer;
+  background: var(--accent); color: var(--accent-ink); font: 600 1rem/1 var(--font-body);
+  display: grid; place-items: center; z-index: 2;
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.hotspot[aria-expanded="true"] { background: var(--fg); }
+.hotspot .tip {
+  position: absolute; left: 50%; bottom: calc(100% + 12px); transform: translateX(-50%);
+  width: max-content; max-width: 220px; text-align: left; white-space: normal;
+  background: var(--fg); color: var(--bg); padding: 10px 12px; border-radius: 10px;
+  font: 400 .8rem/1.4 var(--font-body); visibility: hidden;
+}
+.hotspot .tip b { display: block; font-weight: 700; margin-bottom: 2px; }
+.hotspot:hover .tip, .hotspot:focus-visible .tip, .hotspot[aria-expanded="true"] .tip { visibility: visible; }
+.h1 { top: 30%; left: 28%; } .h2 { top: 44%; left: 54%; } .h3 { top: 62%; left: 44%; }
+
+.product-copy { display: grid; gap: 28px; min-width: 0; }
+.product-copy h2 { font-size: var(--step-3); }
+.product-copy > p { color: var(--muted); max-width: 52ch; }
+.specs { display: grid; grid-template-columns: repeat(2, 1fr); border-top: 1px solid var(--line); margin: 0; }
+.specs div { padding-block: 16px; border-bottom: 1px solid var(--line); display: grid; gap: 2px; }
+.specs div:nth-child(odd) { padding-right: 16px; }
+.specs dt { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.specs dd { margin: 0; font-size: var(--step-1); font-family: var(--font-display); font-variant-numeric: tabular-nums; }
+.inci { font-family: var(--font-mono); font-size: .75rem; line-height: 1.7; color: var(--muted); }
+@media (max-width: 860px) { .product .wrap { grid-template-columns: 1fr; } .product-visual { width: min(440px, 100%); justify-self: center; } }
 
 /* Benefits */
-.benefits-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(24px, 4vw, 56px); }
-.benefit { display: grid; gap: 12px; align-content: start; padding-top: 22px; border-top: 1px solid var(--line); }
+.benefits-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(20px, 3vw, 40px); }
+.benefit { display: grid; gap: 14px; align-content: start; padding-top: 24px; border-top: 1px solid var(--line); }
+.benefit svg { width: 44px; height: 44px; color: var(--accent); }
 .benefit h3 { font-size: var(--step-2); }
 .benefit p { color: var(--muted); }
 @media (max-width: 860px) { .benefits-grid { grid-template-columns: 1fr; } }
 
+/* Impact */
+.impact { background: var(--accent); color: var(--accent-ink); }
+.impact .wrap { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
+.impact-item { display: grid; gap: 6px; }
+.impact-item .num { font-family: var(--font-display); font-size: var(--step-4); line-height: .95; font-variant-numeric: tabular-nums; }
+.impact-item p { font-size: var(--step--1); max-width: 26ch; opacity: .85; }
+@media (max-width: 760px) { .impact .wrap { grid-template-columns: 1fr; } }
+
 /* Shop */
 .shop-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-.card { border: 1px solid var(--line); padding: 28px; display: grid; gap: 18px; grid-template-rows: auto auto 1fr auto; background: var(--bg); }
-.card.featured { border-color: var(--fg); }
-.card .tagline { font-size: 0.72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); min-height: 1.2em; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 28px; display: grid; gap: 16px; grid-template-rows: auto auto 1fr auto; }
+.card:hover { border-color: var(--accent); }
+.card.featured { background: var(--surface-2); border-color: var(--accent); }
+.card .badge { justify-self: start; font-family: var(--font-mono); font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; color: var(--leaf); border: 1px solid currentColor; padding: 4px 10px; border-radius: 999px; }
+.card .badge.blank { visibility: hidden; }
 .card h3 { font-size: var(--step-2); }
-.card ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; color: var(--muted); font-size: 0.9375rem; align-content: start; }
-.card .price { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-top: 18px; border-top: 1px solid var(--line); }
-.card .price strong { font-family: var(--font-display); font-size: var(--step-2); font-weight: 500; font-variant-numeric: tabular-nums; }
-.card .price small { display: block; font-size: 0.75rem; color: var(--muted); font-family: var(--font-body); }
+.card ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; color: var(--muted); font-size: var(--step--1); align-content: start; }
+.card ul li { display: flex; gap: 10px; }
+.card ul li::before { content: "·"; color: var(--accent); font-weight: 700; }
+.card .price { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-top: 16px; border-top: 1px solid var(--line); }
+.card .price strong { font-family: var(--font-display); font-size: var(--step-2); font-weight: 400; font-variant-numeric: tabular-nums; }
+.card .price span { color: var(--muted); font-size: var(--step--1); }
+.mini-beans { display: flex; gap: 6px; height: 34px; align-items: end; }
+.mini-beans svg { height: 100%; width: auto; }
 @media (max-width: 900px) { .shop-grid { grid-template-columns: 1fr; } }
 
 /* Cafeterías */
 .partners { background: var(--surface); }
-.partners .wrap { display: grid; grid-template-columns: 5fr 7fr; gap: clamp(32px, 5vw, 80px); align-items: start; }
-.partners-copy { display: grid; gap: 20px; min-width: 0; }
+.partners .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(32px, 6vw, 96px); align-items: start; }
+.partners-copy { display: grid; gap: 22px; min-width: 0; }
 .partners-copy h2 { font-size: var(--step-3); }
-.partners-copy p { color: var(--muted); max-width: 46ch; }
-.perks { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
-.perks li { padding-block: 12px; border-bottom: 1px solid var(--line); }
-form { display: grid; gap: 18px; background: var(--bg); border: 1px solid var(--line); padding: clamp(20px, 3vw, 40px); }
+.partners-copy p { color: var(--muted); max-width: 50ch; }
+.perks { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.perks li { display: flex; gap: 12px; align-items: baseline; }
+.perks li span { font-family: var(--font-mono); font-size: .75rem; color: var(--leaf); min-width: 2.5ch; }
+form { display: grid; gap: 16px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: clamp(20px, 3vw, 36px); }
 .field { display: grid; gap: 6px; }
-.field label { font-size: 0.72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
-.field input, .field select { width: 100%; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 0; padding: 12px 14px; }
-.field input:focus, .field select:focus { outline: none; border-color: var(--fg); }
-.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-.form-done { color: var(--accent); font-weight: 600; }
+.field label { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.field input, .field select { width: 100%; font: inherit; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
+.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form-done { color: var(--leaf); font-weight: 600; }
 @media (max-width: 860px) { .partners .wrap, .row-2 { grid-template-columns: 1fr; } }
 
 /* Footer */
-footer { padding-block: 48px; border-top: 1px solid var(--line); }
-footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; color: var(--muted); font-size: var(--step--1); }
-footer nav { display: flex; gap: 24px; flex-wrap: wrap; }
-footer a { text-decoration: none; }
-footer a:hover { color: var(--fg); }
+footer { padding-block: 56px 40px; border-top: 1px solid var(--line); }
+footer .wrap { display: grid; gap: 40px; }
+.foot-big { font-family: var(--font-display); font-size: clamp(3.5rem, 2rem + 9vw, 10rem); line-height: .85; letter-spacing: -0.02em; color: var(--surface-2); user-select: none; }
+.foot-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; color: var(--muted); font-size: var(--step--1); }
+.foot-row nav { display: flex; gap: 20px; flex-wrap: wrap; }
+.foot-row a { text-decoration: none; }
+.foot-row a:hover { color: var(--fg); }
+
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 </style>
 </head>
 <body>
 
+<!-- Small bean mark for the logo and shop cards -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <radialGradient id="beanBody" cx="38%" cy="30%" r="80%">
+      <stop offset="0%" style="stop-color:var(--bean-hi)"/>
+      <stop offset="45%" style="stop-color:var(--bean-mid)"/>
+      <stop offset="100%" style="stop-color:var(--bean-lo)"/>
+    </radialGradient>
+    <symbol id="bean" viewBox="0 0 300 400">
+      <ellipse cx="150" cy="200" rx="112" ry="152" fill="url(#beanBody)"/>
+      <path d="M150 52 C 118 112, 186 168, 150 214 S 116 300, 152 348" fill="none" style="stroke:var(--bean-crease)" stroke-width="15" stroke-linecap="round"/>
+    </symbol>
+  </defs>
+</svg>
+
 <header class="nav">
   <div class="wrap">
-    <a class="logo" href="#top" aria-label="Poso, inicio">POSO</a>
+    <a class="logo" href="#top" aria-label="Poso, inicio">
+      <svg viewBox="0 0 300 400" aria-hidden="true"><use href="#bean"/></svg>
+      Poso
+    </a>
     <nav aria-label="Principal">
       <ul>
         <li><a href="#proceso">Proceso</a></li>
@@ -225,196 +314,238 @@ footer a:hover { color: var(--fg); }
         <li><a href="#cafeterias">Cafeterías</a></li>
       </ul>
     </nav>
-    <a class="btn btn-solid" href="#tienda">Comprar</a>
+    <a class="btn btn-primary" href="#tienda">Comprar</a>
   </div>
 </header>
 
 <main id="top">
-  <section class="hero" aria-labelledby="hero-title" style="border-top:0">
+  <!-- HERO -->
+  <section class="hero" aria-labelledby="hero-title">
     <div class="wrap">
       <div class="hero-copy">
-        <p class="label">Grano · Jabón de café recuperado</p>
-        <h1 id="hero-title">El café que sobra, convertido en jabón.</h1>
-        <p class="lede">Recogemos el café molido de las cafeterías de tu barrio y lo transformamos en un jabón exfoliante con forma de grano, hecho a mano y curado durante seis semanas.</p>
+        <p class="eyebrow">Jabón de café recuperado</p>
+        <h1 id="hero-title">Del filtro a tu <em>piel</em>.</h1>
+        <p class="lede">Grano es un jabón exfoliante con forma de grano de café, hecho a mano con el café molido que sobra en las cafeterías de tu barrio.</p>
         <div class="ctas">
-          <a class="btn btn-solid" href="#tienda">Comprar · 9 €</a>
-          <a class="btn" href="#proceso">Cómo lo hacemos</a>
+          <a class="btn btn-primary" href="#tienda">Probar Grano · 9 €</a>
+          <a class="btn btn-ghost" href="#proceso">Cómo lo hacemos</a>
         </div>
-        <dl class="facts">
-          <div><dt>Peso</dt><dd>110 g</dd></div>
-          <div><dt>Café recuperado</dt><dd>18 g</dd></div>
-          <div><dt>Curado</dt><dd>6 semanas</dd></div>
-        </dl>
+        <div class="hero-meta">
+          <span>Saponificado en frío</span>
+          <span>Vegano</span>
+          <span>Sin plástico</span>
+        </div>
       </div>
 
-      <figure class="viewer" id="viewer" aria-label="Modelo 3D del jabón Grano. Arrastra para girarlo." style="margin:0">
+      <figure class="viewer" id="viewer" aria-label="Modelo 3D del jabón Grano. Arrastra para girarlo.">
         <canvas id="soap"></canvas>
-        <div class="viewer-top">
-          <span class="label">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M2.5 8a5.5 5.5 0 0 1 10-3.2M13.5 8a5.5 5.5 0 0 1-10 3.2"/><path d="M12.8 2v3h-3M3.2 14v-3h3"/></svg>
-            Arrastra para girar
-          </span>
-          <span class="dims">7 × 5 × 3 cm</span>
-        </div>
-        <div class="viewer-bottom">
-          <div class="views" role="group" aria-label="Vistas del jabón">
-            <button type="button" data-view="front" aria-pressed="true">Frente</button>
-            <button type="button" data-view="back" aria-pressed="false">Dorso</button>
-            <button type="button" data-view="side" aria-pressed="false">Perfil</button>
-          </div>
+        <span class="viewer-hint">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M2.5 8a5.5 5.5 0 0 1 10-3.2M13.5 8a5.5 5.5 0 0 1-10 3.2"/><path d="M12.8 2v3h-3M3.2 14v-3h3"/></svg>
+          Arrastra para girar · 7 × 5 × 3 cm
+        </span>
+        <div class="views" role="group" aria-label="Vistas del jabón">
+          <button type="button" data-view="front" aria-pressed="true">Frente</button>
+          <button type="button" data-view="back" aria-pressed="false">Base</button>
+          <button type="button" data-view="side" aria-pressed="false">Perfil</button>
         </div>
         <p class="viewer-fallback" id="fallback" hidden>Tu navegador no puede mostrar el modelo 3D.</p>
       </figure>
     </div>
   </section>
 
+  <div class="band" aria-hidden="true">
+    <div class="wrap">
+      <span>Poso rescatado</span><span><i>Saponificado en frío</i></span><span>Hecho a mano</span><span><i>Residuo cero</i></span><span>Del barrio</span>
+    </div>
+  </div>
+
+  <!-- PROBLEMA -->
   <section class="problem" aria-labelledby="problem-title">
     <div class="wrap">
       <div>
-        <div class="figure">5–10 kg</div>
-        <p class="figure-cap">de café molido tira cada día una cafetería de barrio.</p>
+        <div class="big-number">5–10<small>kg</small></div>
+        <p class="big-cap">de café molido tira cada día una cafetería de barrio.</p>
       </div>
       <div class="problem-copy">
-        <p class="label">Por qué existimos</p>
+        <p class="eyebrow">El problema</p>
         <h2 id="problem-title">El poso es el residuo que nadie ve.</h2>
-        <p>Cuando se prepara un espresso, el café molido se usa una sola vez y acaba en la basura. En el vertedero se descompone y libera metano. Sin embargo, sigue conservando aceites, aroma y una textura perfecta para exfoliar la piel.</p>
-        <p>Poso nace para darle un segundo uso: lo recogemos cada día, lo secamos y lo convertimos en un jabón que dura semanas.</p>
+        <p class="lead">De cada espresso solo bebemos una pequeña parte del grano. El resto, el poso, acaba en la basura.</p>
+        <p class="note">En el vertedero se descompone y libera metano. Sin embargo, conserva aceites, aroma y una textura perfecta para exfoliar. Nosotros lo recogemos y lo convertimos en jabón.</p>
       </div>
     </div>
   </section>
 
-  <section id="proceso" aria-labelledby="process-title">
+  <!-- PROCESO -->
+  <section class="process" id="proceso" aria-labelledby="process-title">
     <div class="wrap">
-      <div class="head">
-        <div>
-          <p class="label">Proceso</p>
-          <h2 id="process-title">De la cafetera al lavabo.</h2>
-        </div>
-        <p>Cada pieza tarda unas siete semanas en estar lista. La mayor parte de ese tiempo es curado, que es lo que hace que el jabón sea suave y dure más.</p>
+      <div class="section-head">
+        <p class="eyebrow">Proceso</p>
+        <h2 id="process-title">De la cafetera al lavabo en cinco pasos.</h2>
+        <p>Cada Grano tarda unas siete semanas en llegar a tu casa. La mayor parte de ese tiempo es curado: dejamos que el jabón se asiente para que sea suave y dure más.</p>
       </div>
       <ol class="steps">
         <li class="step">
-          <span class="n">01</span>
-          <h3>Recogida</h3>
-          <p>Pasamos por las cafeterías asociadas y recogemos el café molido del día en cubos reutilizables.</p>
+          <span class="dot">01</span>
+          <h3>Recogemos</h3>
+          <p>Pasamos por las cafeterías asociadas y recogemos el poso del día en cubos reutilizables.</p>
           <span class="spec">Ruta diaria</span>
         </li>
         <li class="step">
-          <span class="n">02</span>
-          <h3>Secado</h3>
-          <p>Lo secamos a baja temperatura para eliminar la humedad y evitar moho.</p>
+          <span class="dot">02</span>
+          <h3>Secamos</h3>
+          <p>El poso se seca a baja temperatura para eliminar la humedad y evitar moho.</p>
           <span class="spec">60 °C · 12 h</span>
         </li>
         <li class="step">
-          <span class="n">03</span>
-          <h3>Saponificación</h3>
+          <span class="dot">03</span>
+          <h3>Saponificamos</h3>
           <p>Lo mezclamos en frío con aceite de oliva, manteca de karité y aceite de coco.</p>
           <span class="spec">Por debajo de 40 °C</span>
         </li>
         <li class="step">
-          <span class="n">04</span>
-          <h3>Moldeado</h3>
-          <p>Vertemos la pasta en moldes con forma de grano, con su surco central.</p>
+          <span class="dot">04</span>
+          <h3>Moldeamos</h3>
+          <p>Vertemos la pasta en moldes con forma de grano, con el surco en la cara redondeada.</p>
           <span class="spec">110 g por pieza</span>
         </li>
         <li class="step">
-          <span class="n">05</span>
-          <h3>Curado</h3>
-          <p>Seis semanas en estantería hasta que el jabón está firme y su pH se estabiliza.</p>
+          <span class="dot">05</span>
+          <h3>Curamos</h3>
+          <p>Seis semanas en estantería, girándolos a mano, hasta que el jabón está firme y suave.</p>
           <span class="spec">6 semanas · pH 9–10</span>
         </li>
       </ol>
     </div>
   </section>
 
-  <section class="details" id="grano" aria-labelledby="details-title">
+  <!-- PRODUCTO -->
+  <section class="product" id="grano" aria-labelledby="product-title">
     <div class="wrap">
-      <div class="details-intro">
-        <p class="label">El jabón</p>
-        <h2 id="details-title">Grano.</h2>
-        <p>Un jabón sólido que cabe en la palma de la mano. La cara plana, con su surco, se adapta a los dedos y deja escurrir el agua. El dorso, redondeado, es el que usas para exfoliar.</p>
-        <p>Huele a café recién hecho y sirve igual en la ducha que junto al fregadero de la cocina.</p>
+      <div class="product-visual" id="productVisual">
+        <div class="ring" aria-hidden="true"></div>
+        <img id="productShot" alt="Jabón Grano visto de tres cuartos" hidden>
+        <button class="hotspot h1" type="button" aria-expanded="false" aria-label="Poso de café">+
+          <span class="tip" role="tooltip"><b>Poso de café</b>Partículas finas que exfolian sin irritar.</span>
+        </button>
+        <button class="hotspot h2" type="button" aria-expanded="false" aria-label="El surco">+
+          <span class="tip" role="tooltip"><b>El surco</b>Recorre la cara redondeada y hace de agarre para los dedos.</span>
+        </button>
+        <button class="hotspot h3" type="button" aria-expanded="false" aria-label="Aceites vegetales">+
+          <span class="tip" role="tooltip"><b>Aceites vegetales</b>Oliva, karité y coco. Nada de aceite de palma.</span>
+        </button>
       </div>
-      <dl class="spec-table">
-        <div><dt>Peso</dt><dd>110 g</dd></div>
-        <div><dt>Medidas</dt><dd>7 × 5 × 3 cm</dd></div>
-        <div><dt>Café recuperado</dt><dd>18 g por pieza</dd></div>
-        <div><dt>Duración</dt><dd>≈ 6 semanas</dd></div>
-        <div><dt>Tipo de piel</dt><dd>Todo tipo</dd></div>
-        <div><dt>Envase</dt><dd>Papel kraft</dd></div>
-        <div class="wide"><dt>Ingredientes (INCI)</dt><dd>Sodium Olivate, Sodium Cocoate, Sodium Shea Butterate, Aqua, Coffea Arabica Seed Powder, Glycerin, Coffea Arabica Seed Oil.</dd></div>
-      </dl>
+      <div class="product-copy">
+        <p class="eyebrow">Nuestro producto estrella</p>
+        <h2 id="product-title">Grano.</h2>
+        <p>Un jabón sólido que cabe en la palma de la mano y huele a café recién hecho. La base plana lo mantiene estable en la jabonera y el dorso, con su surco, se adapta a la mano. El poso exfolia y los aceites dejan la piel hidratada.</p>
+        <dl class="specs">
+          <div><dt>Peso</dt><dd>110 g</dd></div>
+          <div><dt>Medidas</dt><dd>7 × 5 × 3 cm</dd></div>
+          <div><dt>Poso por pieza</dt><dd>18 g</dd></div>
+          <div><dt>Duración</dt><dd>≈ 6 semanas</dd></div>
+        </dl>
+        <p class="inci">INCI: Sodium Olivate, Sodium Cocoate, Sodium Shea Butterate, Aqua, Coffea Arabica Seed Powder, Glycerin, Coffea Arabica Seed Oil.</p>
+      </div>
     </div>
   </section>
 
-  <section aria-labelledby="benefits-title">
+  <!-- BENEFICIOS -->
+  <section class="benefits" aria-labelledby="benefits-title">
     <div class="wrap">
-      <div class="head">
-        <div>
-          <p class="label">Por qué café</p>
-          <h2 id="benefits-title">Lo que el café hace por tu piel.</h2>
-        </div>
+      <div class="section-head">
+        <p class="eyebrow">Por qué café</p>
+        <h2 id="benefits-title">Lo que el poso hace por tu piel.</h2>
       </div>
       <div class="benefits-grid">
         <article class="benefit">
+          <svg viewBox="0 0 44 44" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="14" r="2.5" fill="currentColor"/><circle cx="26" cy="10" r="1.6" fill="currentColor"/><circle cx="32" cy="22" r="2.2" fill="currentColor"/><circle cx="18" cy="26" r="1.8" fill="currentColor"/><circle cx="10" cy="32" r="1.4" fill="currentColor"/><circle cx="28" cy="34" r="2.6" fill="currentColor"/></svg>
           <h3>Exfolia</h3>
-          <p>Las partículas de café retiran las células muertas con suavidad. Ideal para codos, rodillas y manos que trabajan.</p>
+          <p>El café molido retira las células muertas con suavidad. Ideal para codos, rodillas y manos de trabajo.</p>
         </article>
         <article class="benefit">
+          <svg viewBox="0 0 44 44" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 30c6-10 10 6 16-4s8 4 12-2"/><path d="M8 20c6-10 10 6 16-4s8 4 12-2"/><path d="M10 38h24"/></svg>
           <h3>Elimina olores</h3>
-          <p>El café neutraliza el olor a ajo, cebolla o pescado en las manos. Por eso también tiene sitio en la cocina.</p>
+          <p>El café neutraliza el olor a ajo, cebolla o pescado en las manos. Por eso también vive bien en la cocina.</p>
         </article>
         <article class="benefit">
+          <svg viewBox="0 0 44 44" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="22" cy="22" r="7"/><path d="M22 6v5M22 33v5M6 22h5M33 22h5M10.7 10.7l3.5 3.5M29.8 29.8l3.5 3.5M10.7 33.3l3.5-3.5M29.8 14.2l3.5-3.5"/></svg>
           <h3>Activa</h3>
-          <p>La cafeína estimula la circulación y deja la piel con un tono más uniforme.</p>
+          <p>La cafeína estimula la circulación y deja la piel con un tono más uniforme. Un espresso, pero por fuera.</p>
         </article>
       </div>
     </div>
   </section>
 
-  <section id="tienda" aria-labelledby="shop-title">
+  <!-- IMPACTO -->
+  <section class="impact" aria-label="Impacto">
     <div class="wrap">
-      <div class="head">
-        <div>
-          <p class="label">Tienda</p>
-          <h2 id="shop-title">Elige tu formato.</h2>
-        </div>
-        <p>Envío gratuito a partir de 25 €. Cada pedido se envía en papel kraft compostable, sin plástico.</p>
+      <div class="impact-item">
+        <div class="num">18 g</div>
+        <p>de poso que no va a la basura con cada jabón</p>
+      </div>
+      <div class="impact-item">
+        <div class="num">55</div>
+        <p>jabones por cada kilo de poso que recogemos</p>
+      </div>
+      <div class="impact-item">
+        <div class="num">0 g</div>
+        <p>de plástico en el producto y en el envío</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- TIENDA -->
+  <section class="shop" id="tienda" aria-labelledby="shop-title">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Tienda</p>
+        <h2 id="shop-title">Elige tu dosis.</h2>
+        <p>Envío gratis a partir de 25 €. Cada pedido llega en papel kraft compostable.</p>
       </div>
       <div class="shop-grid">
         <article class="card">
-          <p class="tagline"></p>
-          <h3>Un Grano</h3>
-          <ul><li>1 jabón de 110 g</li><li>Unas 6 semanas de uso</li><li>Para probarlo</li></ul>
-          <div class="price"><strong>9 €</strong><a class="btn" href="#tienda">Añadir</a></div>
+          <span class="badge blank" aria-hidden="true">·</span>
+          <div class="mini-beans" aria-hidden="true"><svg viewBox="0 0 300 400"><use href="#bean"/></svg></div>
+          <div>
+            <h3>Un Grano</h3>
+            <ul><li>1 jabón de 110 g</li><li>Unas 6 semanas de uso</li><li>Perfecto para probar</li></ul>
+          </div>
+          <div class="price"><strong>9 €</strong><a class="btn btn-ghost" href="#tienda">Añadir</a></div>
         </article>
         <article class="card featured">
-          <p class="tagline">El más pedido</p>
-          <h3>Saco de tres</h3>
-          <ul><li>3 jabones de 110 g</li><li>Bolsa de yute reutilizable</li><li>Para la ducha, el lavabo y la cocina</li></ul>
-          <div class="price"><strong>24 €</strong><a class="btn btn-solid" href="#tienda">Añadir</a></div>
+          <span class="badge">El más pedido</span>
+          <div class="mini-beans" aria-hidden="true"><svg viewBox="0 0 300 400"><use href="#bean"/></svg><svg viewBox="0 0 300 400"><use href="#bean"/></svg><svg viewBox="0 0 300 400"><use href="#bean"/></svg></div>
+          <div>
+            <h3>Saco de 3</h3>
+            <ul><li>3 jabones de 110 g</li><li>Bolsa de yute reutilizable</li><li>Para la ducha, el lavabo y la cocina</li></ul>
+          </div>
+          <div class="price"><strong>24 €</strong><a class="btn btn-primary" href="#tienda">Añadir</a></div>
         </article>
         <article class="card">
-          <p class="tagline">Suscripción</p>
-          <h3>Recarga</h3>
-          <ul><li>2 jabones cada 2 meses</li><li>Envío siempre gratuito</li><li>Pausa o cancela cuando quieras</li></ul>
-          <div class="price"><strong>15 €<small>cada 2 meses</small></strong><a class="btn" href="#tienda">Suscribirme</a></div>
+          <span class="badge">Suscripción</span>
+          <div class="mini-beans" aria-hidden="true"><svg viewBox="0 0 300 400"><use href="#bean"/></svg><svg viewBox="0 0 300 400"><use href="#bean"/></svg></div>
+          <div>
+            <h3>Recarga</h3>
+            <ul><li>2 jabones cada 2 meses</li><li>Envío siempre gratis</li><li>Pausa o cancela cuando quieras</li></ul>
+          </div>
+          <div class="price"><strong>15 €</strong><span>cada 2 meses</span></div>
         </article>
       </div>
     </div>
   </section>
 
+  <!-- CAFETERÍAS -->
   <section class="partners" id="cafeterias" aria-labelledby="partners-title">
     <div class="wrap">
       <div class="partners-copy">
-        <p class="label">Para cafeterías</p>
-        <h2 id="partners-title">Tu café molido, nuestro jabón.</h2>
-        <p>Recogemos el café usado de tu cafetería sin ningún coste. Reduces residuos y tu nombre aparece en cada lote que fabricamos con él.</p>
+        <p class="eyebrow">¿Tienes una cafetería?</p>
+        <h2 id="partners-title">Tu poso, nuestro jabón.</h2>
+        <p>Recogemos el café molido de tu cafetera sin coste. Tú reduces residuos y tus clientes ven tu nombre en cada caja.</p>
         <ul class="perks">
-          <li>Recogida gratuita de lunes a viernes</li>
-          <li>Cubos reutilizables que te dejamos nosotros</li>
-          <li>Tu cafetería en la etiqueta del lote</li>
-          <li>Jabones con tu marca para vender en barra</li>
+          <li><span>→</span> Recogida gratuita, de lunes a viernes</li>
+          <li><span>→</span> Cubos reutilizables que te dejamos nosotros</li>
+          <li><span>→</span> Tu cafetería en la etiqueta del lote</li>
+          <li><span>→</span> Jabones con tu marca para vender en barra</li>
         </ul>
       </div>
       <form id="partnerForm" novalidate>
@@ -441,8 +572,8 @@ footer a:hover { color: var(--fg); }
           <label for="email">Email de contacto</label>
           <input id="email" name="email" type="email" autocomplete="email" placeholder="hola@cafelaesquina.com" required>
         </div>
-        <button class="btn btn-solid" type="submit">Quiero sumarme</button>
-        <p class="form-done" id="formDone" role="status" hidden>Recibido. Te escribiremos en menos de 48 horas para organizar la primera recogida.</p>
+        <button class="btn btn-primary" type="submit">Quiero sumarme</button>
+        <p class="form-done" id="formDone" role="status" hidden>Recibido. Te escribimos en menos de 48 horas para organizar la primera recogida.</p>
       </form>
     </div>
   </section>
@@ -450,13 +581,16 @@ footer a:hover { color: var(--fg); }
 
 <footer>
   <div class="wrap">
-    <span>© 2026 Poso · Jabones de café recuperado</span>
-    <nav aria-label="Pie de página">
-      <a href="#proceso">Proceso</a>
-      <a href="#grano">El jabón</a>
-      <a href="#tienda">Tienda</a>
-      <a href="#cafeterias">Cafeterías</a>
-    </nav>
+    <div class="foot-big" aria-hidden="true">poso.</div>
+    <div class="foot-row">
+      <span>© 2026 Poso · Jabones de café recuperado</span>
+      <nav aria-label="Pie de página">
+        <a href="#proceso">Proceso</a>
+        <a href="#grano">El jabón</a>
+        <a href="#tienda">Tienda</a>
+        <a href="#cafeterias">Cafeterías</a>
+      </nav>
+    </div>
   </div>
 </footer>
 
@@ -476,13 +610,14 @@ footer a:hover { color: var(--fg); }
   } catch (e) {
     canvas.hidden = true;
     document.getElementById('fallback').hidden = false;
+    document.querySelector('.views').hidden = true;
     return;
   }
   const T = THREE;
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
   renderer.outputEncoding = T.sRGBEncoding;
   renderer.toneMapping = T.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.95;
+  renderer.toneMappingExposure = 1.0;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = T.VSMShadowMap;
 
@@ -494,7 +629,7 @@ footer a:hover { color: var(--fg); }
   camera.position.set(0, 1.1, 9);
   camera.lookAt(0, -0.25, 0);
 
-  const key = new T.DirectionalLight(0xfff3e6, 1.5);
+  const key = new T.DirectionalLight(0xfff3e6, 1.6);
   key.position.set(-3, 7, 4);
   key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024);
@@ -502,38 +637,37 @@ footer a:hover { color: var(--fg); }
   key.shadow.blurSamples = 20;
   Object.assign(key.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, near: 1, far: 20 });
   scene.add(key);
-  const rim = new T.DirectionalLight(0xffffff, 0.5);
+  const rim = new T.DirectionalLight(0xffe2c4, 0.5);
   rim.position.set(4, 2, -5);
   scene.add(rim);
 
-  const floor = new T.Mesh(new T.PlaneGeometry(10, 10), new T.ShadowMaterial({ opacity: 0.16 }));
+  const floor = new T.Mesh(new T.PlaneGeometry(10, 10), new T.ShadowMaterial({ opacity: 0.3 }));
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -1.85;
   floor.receiveShadow = true;
   scene.add(floor);
 
-  // ---------- Geometry: a coffee bean, flat face with an S-shaped crease, domed back ----------
+  // ---------- Geometry: flat base, domed back carrying a soft S-shaped crease ----------
   const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   function beanGeometry() {
     let g = new T.SphereGeometry(1, 360, 360);
     const p = g.attributes.position, v = new T.Vector3();
-    const A = 1.0, B = 1.38, CF = 0.34, CB = 0.64;
+    const A = 1.0, B = 1.38, CF = 0.34, CB = 0.66;
     for (let i = 0; i < p.count; i++) {
       v.fromBufferAttribute(p, i);
       const nx = v.x, ny = v.y, nz = v.z;
-      let x = A * nx * (1 - 0.05 * ny);
-      let y = B * ny;
+      const x = A * nx * (1 - 0.05 * ny);
+      const y = B * ny;
       let z = nz >= 0 ? CF * Math.pow(nz, 0.4) : -CB * Math.pow(-nz, 0.85);
-      // crease on the flat face
+      // crease on the domed side: a wide soft valley with a gently defined bottom, fading out towards both tips
       const t = y / B;
       const xc = 0.1 * Math.sin(t * 2.7) - 0.02;
-      const w = 0.06 + 0.03 * (1 - Math.abs(t));
-      const dx = x - xc;
-      const taper = 1 - smooth(0.55, 0.93, Math.abs(t));
-      const front = smooth(0.12, 0.55, nz);
-      z -= 0.21 * Math.exp(-(dx * dx) / (w * w)) * taper * front;
-      // soft shoulders either side of the crease
-      z += 0.018 * Math.exp(-Math.pow((Math.abs(dx) - w * 1.9) / w, 2)) * taper * front;
+      const w = 0.16 + 0.05 * (1 - Math.abs(t));
+      const dx = (x - xc) / w;
+      const valley = 0.5 * Math.exp(-dx * dx) + 0.5 * Math.exp(-dx * dx * 5);
+      const taper = Math.pow(1 - smooth(0.25, 0.97, Math.abs(t)), 1.5);
+      const dome = smooth(0.2, 0.75, -nz);
+      z += 0.26 * valley * taper * dome;
       // hand-made irregularity
       const n = 0.012 * Math.sin(3.1 * x + 1.3) * Math.sin(2.3 * y + 0.4) + 0.008 * Math.sin(5.7 * y + 2.0 * x);
       p.setXYZ(i, x * (1 + n), y * (1 + n * 0.5), z * (1 + n));
@@ -558,7 +692,7 @@ footer a:hover { color: var(--fg); }
   const material = new T.MeshPhysicalMaterial({
     color: 0xffffff, roughness: 0.62, metalness: 0,
     sheen: 0.25, sheenRoughness: 0.8, sheenColor: new T.Color(0x6b4a33),
-    clearcoat: 0.08, clearcoatRoughness: 0.6
+    clearcoat: 0.0
   });
   material.onBeforeCompile = shader => {
     Object.assign(shader.uniforms, uniforms);
@@ -627,11 +761,13 @@ footer a:hover { color: var(--fg); }
   pivot.add(soap);
   scene.add(pivot);
 
+  // The crease is on the -z (domed) side, so "front" turns that side to the camera.
   const VIEWS = {
-    front: new T.Quaternion().setFromEuler(new T.Euler(-0.18, 0.32, -0.38)),
-    back: new T.Quaternion().setFromEuler(new T.Euler(0.18, Math.PI + 0.32, 0.38)),
+    front: new T.Quaternion().setFromEuler(new T.Euler(0.18, Math.PI + 0.32, 0.38)),
+    back: new T.Quaternion().setFromEuler(new T.Euler(-0.18, 0.32, -0.38)),
     side: new T.Quaternion().setFromEuler(new T.Euler(-0.05, Math.PI / 2 + 0.25, -0.3))
   };
+  const SHOT = new T.Quaternion().setFromEuler(new T.Euler(-0.1, Math.PI - 0.4, -0.5));
   pivot.quaternion.copy(VIEWS.front);
 
   // ---------- Render on demand ----------
@@ -639,12 +775,29 @@ footer a:hover { color: var(--fg); }
   const render = () => { queued = false; renderer.render(scene, camera); };
   const request = () => { if (!queued) { queued = true; requestAnimationFrame(render); } };
 
+  // Still of the soap for the product section, rendered from the same model
+  const shotImg = document.getElementById('productShot');
+  let shotTaken = false;
+  function takeShot() {
+    const keep = pivot.quaternion.clone();
+    pivot.quaternion.copy(SHOT);
+    floor.visible = false;
+    renderer.render(scene, camera);
+    shotImg.src = canvas.toDataURL('image/png');
+    shotImg.hidden = false;
+    floor.visible = true;
+    pivot.quaternion.copy(keep);
+    renderer.render(scene, camera);
+    shotTaken = true;
+  }
+
   function resize() {
     const r = viewer.getBoundingClientRect();
     if (!r.width || !r.height) return;
     renderer.setSize(r.width, r.height, false);
     camera.aspect = r.width / r.height;
     camera.updateProjectionMatrix();
+    if (!shotTaken) takeShot();
     request();
   }
   new ResizeObserver(resize).observe(viewer);
@@ -661,7 +814,7 @@ footer a:hover { color: var(--fg); }
   }
   canvas.addEventListener('pointerdown', e => {
     cancelAnimationFrame(spin); cancelAnimationFrame(tween);
-    drag = { x: e.clientX, y: e.clientY, t: performance.now() };
+    drag = { x: e.clientX, y: e.clientY };
     vel = { x: 0, y: 0 };
     canvas.setPointerCapture(e.pointerId);
     setPressed(null);
@@ -705,8 +858,15 @@ footer a:hover { color: var(--fg); }
   }));
 })();
 
-// Partner form (front-end only; connect it to your backend or a form service)
 (() => {
+  // Hotspots: tap to toggle on touch screens
+  document.querySelectorAll('.hotspot').forEach(btn => btn.addEventListener('click', () => {
+    const open = btn.getAttribute('aria-expanded') === 'true';
+    document.querySelectorAll('.hotspot').forEach(b => b.setAttribute('aria-expanded', 'false'));
+    btn.setAttribute('aria-expanded', String(!open));
+  }));
+
+  // Partner form (front-end only; connect it to your backend or a form service)
   const form = document.getElementById('partnerForm'), done = document.getElementById('formDone');
   form.addEventListener('submit', e => {
     e.preventDefault();
