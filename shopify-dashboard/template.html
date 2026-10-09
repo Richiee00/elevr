@@ -76,6 +76,11 @@ table.yt td.pct{color:var(--muted)}
 .up{color:var(--good);font-weight:600} .dn{color:var(--bad);font-weight:600} .na{color:var(--faint)}
 table.yt td .best{outline:1.5px solid currentColor;border-radius:3px;padding:0 2px}
 .pm{color:var(--warn);font-weight:700}
+table[data-sortkey] thead th{cursor:pointer;user-select:none}
+table[data-sortkey] thead th:hover{color:var(--ink)}
+table[data-sortkey] thead th::after{content:"↕";margin-left:3px;opacity:.35;font-size:.9em}
+table[data-sortkey] thead th[aria-sort="descending"]::after{content:"↓";opacity:1;color:var(--accent)}
+table[data-sortkey] thead th[aria-sort="ascending"]::after{content:"↑";opacity:1;color:var(--accent)}
 .sumgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:14px}
 .sumbox{min-width:0}
 .sumbox h4{margin:0 0 6px;font:700 .74rem var(--f-body);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
@@ -157,7 +162,7 @@ function yoyHTML(cur,base,why,inv){
   if(why) return `<span class="na" title="${esc(why)}">n/c</span>`;
   if(base==null||cur==null||isNaN(base)||isNaN(cur)) return `<span class="na">n/c</span>`;
   if(base===0) return `<span class="na" title="Base 0: no se calcula variación">n/c</span>`;
-  const v=cur/base-1; return `<span class="${(v>=0)!==!!inv?"up":"dn"}" ${inv?'title="Métrica de coste: subir es negativo"':""}>${v>=0?"▲":"▼"} ${pct(Math.abs(v),0)}</span>`;
+  const v=cur/base-1; return `<span data-v="${v}" class="${(v>=0)!==!!inv?"up":"dn"}" ${inv?'title="Métrica de coste: subir es negativo"':""}>${v>=0?"▲":"▼"} ${pct(Math.abs(v),0)}</span>`;
 }
 const yoyVal=(c,b)=>b>0&&c!=null?c/b-1:null;
 
@@ -185,25 +190,27 @@ function yearStatus(y){const w=ywin(y);return (w.a===101&&w.b===1231)?{full:true
 
 /* estado de filtros */
 const S={years:new Set(YEARS),country:"all",product:"all",hlMonth:-1,tab:"s1",
-  s2metric:"u",s2gran:"p",s2top:25,s2rows:"global",s3mode:"val",s4metric:"s",s4top:20,s4rows:"global",heat:"row",chartMetric:"sales",s5month:null,s5metric:"sales"};
+  s2metric:"u",s2gran:"p",s2top:25,s2rows:"global",s3mode:"val",s4metric:"s",s4top:20,s4rows:"global",heat:"row",chartMetric:"sales",s5month:null,s5metric:"sales",envMetric:"ship",envTop:20,sorts:{}};
 try{const t=localStorage.getItem("shopdash-tab");if(t)S.tab=t}catch(e){}
-if(/^#s[1-6]$/.test(location.hash))S.tab=location.hash.slice(1);
+if(/^#(s[1-6]|env)$/.test(location.hash))S.tab=location.hash.slice(1);
 
 /* agregación de pedidos (respeta país y producto) */
-function emptyAgg(){return {orders:0,sales:0,gross:0,pdisc:0,ship:0,sdisc:0,tax:0,tot:0,ref:0,units:0}}
+function emptyAgg(){return {orders:0,sales:0,gross:0,pdisc:0,ship:0,sdisc:0,tax:0,tot:0,ref:0,units:0,shipOrders:0,noShip:0}}
 function addOrder(a,o){
   if(S.country!=="all"&&o.c!==+S.country) return;
   if(S.product==="all"){
     a.orders++;a.sales+=o.sub;a.gross+=o.gross;a.pdisc+=o.pdisc;a.ship+=o.ship;a.sdisc+=o.sdisc;a.tax+=o.tax;a.tot+=o.tot;a.ref+=o.ref;a.units+=o.units;
+    if(o.ship>0.005)a.shipOrders++;else a.noShip++;
   }else{
     const p=+S.product;let hit=false;
     for(const l of o.L) if(l.p===p){hit=true;a.sales+=l.n;a.gross+=l.g;a.units+=l.q;a.pdisc+=l.g-l.n}
-    if(hit){a.orders++;a.ship=a.sdisc=a.tax=a.tot=a.ref=NaN}
+    if(hit){a.orders++;a.ship=a.sdisc=a.tax=a.tot=a.ref=a.shipOrders=a.noShip=NaN}
   }
 }
 function derive(a){
   a.aov=a.orders?a.sales/a.orders:null; a.disc=a.pdisc+a.sdisc; a.netRef=a.tot-a.ref; a.exTax=a.sales-a.tax;
   a.pShip=a.sales?a.ship/a.sales:null; a.pDisc=a.gross?a.pdisc/a.gross:null; a.pRef=a.tot?a.ref/a.tot:null; a.upo=a.orders?a.units/a.orders:null;
+  a.shipList=a.ship+a.sdisc; a.shipAvg=a.shipOrders?a.ship/a.shipOrders:null; a.pNoShip=a.orders?a.noShip/a.orders:null;
   return a;
 }
 function aggWin(y,a,b){const r=emptyAgg();for(const o of O) if(o.y===y&&o.md>=a&&o.md<=b) addOrder(r,o);return derive(r)}
@@ -241,7 +248,7 @@ function entityAgg(kind,pred){
   for(const o of O){
     if(!pred(o))continue; if(S.country!=="all"&&o.c!==+S.country)continue;
     if(kind==="c"){
-      if(S.product==="all"){const e=get(o.c);e.u+=o.units;e.s+=o.sub;e.o++;e.g+=o.gross}
+      if(S.product==="all"){const e=get(o.c);e.u+=o.units;e.s+=o.sub;e.o++;e.g+=o.gross;e.sh=(e.sh||0)+o.ship;e.sd=(e.sd||0)+o.sdisc;e.so=(e.so||0)+(o.ship>0.005?1:0)}
       else{let hit=false;const e0={u:0,s:0};for(const l of o.L)if(l.p===+S.product){hit=true;e0.u+=l.q;e0.s+=l.n}
         if(hit){const e=get(o.c);e.u+=e0.u;e.s+=e0.s;e.o++}}
     }else{
@@ -256,8 +263,8 @@ function entityCube(kind,y){ // map key -> {m:[12 aggs], t}
   const R=new Map();
   for(let m=0;m<12;m++){
     const M=entityAgg(kind,o=>o.y===y&&o.m===m);
-    for(const [k,e] of M){let r=R.get(k);if(!r){r={m:[...Array(12)].map(()=>({u:0,s:0,o:0})),t:{u:0,s:0,o:0}};R.set(k,r)}
-      r.m[m]=e;r.t.u+=e.u;r.t.s+=e.s;r.t.o+=e.o}
+    for(const [k,e] of M){let r=R.get(k);if(!r){r={m:[...Array(12)].map(()=>({u:0,s:0,o:0,sh:0,sd:0,so:0})),t:{u:0,s:0,o:0,sh:0,sd:0,so:0}};R.set(k,r)}
+      e.sh=e.sh||0;e.sd=e.sd||0;e.so=e.so||0;r.m[m]=e;for(const f of ["u","s","o","sh","sd","so"])r.t[f]+=e[f]}
   }
   return R;
 }
@@ -281,14 +288,14 @@ function yearTable(y,rows,opts={}){
       if(r.heat&&max>0&&v>0){const h=Math.min(1,v/max);cls+=" hm"+(h>.62?" hot":"");style=` style="--h:${h.toFixed(3)}"`}
       const t=r.title?` title="${esc(r.title(v,m))}"`:"";
       const txt=r.fmt(v);
-      return `<td class="${cls}${hl}"${style}${t}>${m===best?`<span class="best" title="Mejor mes">${txt}</span>`:txt}</td>`;
+      return `<td class="${cls}${hl}"${style}${t} data-v="${v}">${m===best?`<span class="best" title="Mejor mes">${txt}</span>`:txt}</td>`;
     }).join("");
     const tot=r.totalHTML!=null?r.totalHTML:(r.total==null||(typeof r.total==="number"&&isNaN(r.total))?"—":r.fmt(r.total));
-    const share=opts.share?`<td class="share">${r.share==null?"—":pct(r.share)}</td>`:"";
-    return `<tr class="${r.sep?"sep":""}"><td class="rl" title="${esc(r.label)}">${esc(r.label)}${r.sub?`<span class="sub">${esc(r.sub)}</span>`:""}</td>${tds}<td class="tot">${tot}</td>${share}</tr>`;
+    const share=opts.share?`<td class="share" data-v="${r.share??""}">${r.share==null?"—":pct(r.share)}</td>`:"";
+    return `<tr class="${r.sep?"sep":""}"><td class="rl" title="${esc(r.label)}">${esc(r.label)}${r.sub?`<span class="sub">${esc(r.sub)}</span>`:""}</td>${tds}<td class="tot"${r.totalHTML==null&&r.total!=null&&!isNaN(r.total)?` data-v="${r.total}"`:""}>${tot}</td>${share}</tr>`;
   }).join("");
   const partial=ms.filter(s=>s.s==="partial").map((s,i)=>s.txt);
-  return `<div class="tscroll"><table class="yt"><thead><tr><th class="rl">${esc(opts.rowHead||"Métrica")}</th>${th}<th class="tot">Total anual</th>${opts.share?'<th class="share">% s/ total</th>':""}</tr></thead><tbody>${body}</tbody></table></div>`
+  return `<div class="tscroll"><table class="yt"${opts.sortKey?` data-sortkey="${opts.sortKey}"`:""}><thead><tr><th class="rl">${esc(opts.rowHead||"Métrica")}</th>${th}<th class="tot">Total anual</th>${opts.share?'<th class="share">% s/ total</th>':""}</tr></thead><tbody>${body}</tbody></table></div>`
    +(partial.length?`<div class="foot"><span class="pm">*</span> Mes parcial (${ms.map((s,m)=>s.s==="partial"?MESL[m]+": "+s.txt:"").filter(Boolean).join("; ")}). Las variaciones de ese mes comparan los mismos días del año anterior.</div>`:"");
 }
 function yearHead(y,extra=""){
@@ -308,7 +315,7 @@ function s1(){
   let h=`<div class="vhead"><div><h2>1 · Evolución general</h2><p class="lead">Ventas netas = importe de productos tras descuentos, sin envío (campo <i>Subtotal</i>). Ticket medio = ventas netas / pedidos únicos; el anual se recalcula, no es la media de los meses. Mapa de calor por fila dentro de cada año.</p></div></div>${filterNote()}`;
   // resumen por año
   const rows=selYears().map(y=>{const t=CUBE[y].t,c=yearComp(y);return `<tr><td class="rl">${y}</td><td style="text-align:left"><span class="badge ${yearStatus(y).full?"full":"partial"}">${yearStatus(y).txt}</span></td><td>${eur(t.sales)}</td><td>${int(t.orders)}</td><td>${eur2(t.aov)}</td><td>${int(t.units)}</td><td>${eur(t.disc)}</td><td>${eur(t.ref)}</td><td>${c.why?`<span class="na" title="${esc(c.why)}">n/c</span>`:yoyHTML(c.cur.sales,c.base.sales)+` <span class="na">${esc(c.label)}</span>`}</td><td>${c.why?"—":yoyHTML(c.cur.orders,c.base.orders)}</td><td>${c.why?"—":yoyHTML(c.cur.aov,c.base.aov)}</td></tr>`}).join("");
-  h+=`<div class="panel"><div class="ptitle"><h3>Resumen por año</h3><span class="foot" style="margin:0">Variaciones sobre el mismo periodo del año anterior</span></div><div class="tscroll"><table class="yt" style="min-width:980px"><thead><tr><th class="rl">Año</th><th style="text-align:left">Periodo</th><th>Ventas netas</th><th>Pedidos</th><th>Ticket medio</th><th>Unidades</th><th>Descuentos</th><th>Reembolsos</th><th>Var. ventas</th><th>Var. pedidos</th><th>Var. ticket</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  h+=`<div class="panel"><div class="ptitle"><h3>Resumen por año</h3><span class="foot" style="margin:0">Variaciones sobre el mismo periodo del año anterior</span></div><div class="tscroll"><table class="yt" data-sortkey="s1sum" style="min-width:980px"><thead><tr><th class="rl">Año</th><th style="text-align:left">Periodo</th><th>Ventas netas</th><th>Pedidos</th><th>Ticket medio</th><th>Unidades</th><th>Descuentos</th><th>Reembolsos</th><th>Var. ventas</th><th>Var. pedidos</th><th>Var. ticket</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   h+=`<div class="panel"><div class="ptitle"><h3>Evolución mensual por año</h3>${segHTML("chartMetric",[["sales","Ventas"],["orders","Pedidos"],["aov","Ticket medio"],["units","Unidades"]],S.chartMetric)}</div><div class="chart" id="chart1"></div></div>`;
   for(const y of selYears().slice().reverse()){
     const C=CUBE[y],m=C.m;
@@ -426,7 +433,7 @@ function s2(){
       lossHTML=rankList(dn,pf,0)+`<div class="foot">Ordenado por pérdida absoluta. ${esc(gr.label)}.</div>`;
     }
     h+=`<div class="panel">${yearHead(y,`<span class="legend-heat"><i></i>${S.heat==="row"?"intensidad relativa al máximo de cada fila":"intensidad relativa al máximo de la tabla"}</span>`)}
-      ${yearTable(y,R,{entity:true,rowHead:kind==="v"?"Variante":"Producto",share:true})}
+      ${yearTable(y,R,{entity:true,rowHead:kind==="v"?"Variante":"Producto",share:true,sortKey:"s2"})}
       <div class="foot">${R.length} de ${C.size} ${kind==="v"?"variantes":"productos"} con ventas en ${y}. Total ${mk==="u"?"unidades":"facturación"} del año: ${fmt(total)}.</div>
       <div class="sumgrid">
         <div class="sumbox"><h4>Top 10 por unidades</h4>${rankList(tu.map(e=>({name:e.name,v:e.r.t.u,extra:eur(e.r.t.s)})),int,tu[0]?.r.t.u)}</div>
@@ -501,7 +508,7 @@ function s4(){
       up=rankList(el.filter(e=>e.g>0).sort((a,b)=>b.g-a.g).slice(0,8).map(e=>({name:cname(CTRY[e.k]),v:e.g,extra:`${eur(e.b)} → ${eur(e.a)}`})),pf,0)+`<div class="foot">Facturación, ${esc(gr.label)}; base ≥ 500 €.</div>`;
       dn=rankList(el.filter(e=>e.g<0).sort((a,b)=>a.g-b.g).slice(0,8).map(e=>({name:cname(CTRY[e.k]),v:e.g,extra:`${eur(e.b)} → ${eur(e.a)}`})),pf,0)+`<div class="foot">Facturación, ${esc(gr.label)}; base ≥ 500 €.</div>`;
     }
-    h+=`<div class="panel">${yearHead(y)}${yearTable(y,R,{entity:true,rowHead:"País",share:true})}
+    h+=`<div class="panel">${yearHead(y)}${yearTable(y,R,{entity:true,rowHead:"País",share:true,sortKey:"s4"})}
       <div class="foot">${R.length} de ${C.size} países con ventas en ${y}. % s/ total = peso del país en la métrica seleccionada del año.</div>
       <div class="sumgrid">
         <div class="sumbox"><h4>Top 10 por facturación (% del total)</h4>${rankList(tS.slice(0,10).map(e=>({name:e.name,v:e.r.t.s,extra:pct(totS?e.r.t.s/totS:0)})),eur,tS[0]?.r.t.s)}</div>
@@ -534,7 +541,7 @@ function s5(){
   // mapa de calor año x mes
   const hm=[["sales","Ventas netas",eur],["orders","Pedidos",int],["aov","Ticket medio",eur2],["units","Unidades",int]];
   const hmTable=(k,f,label)=>{let max=0;ys.forEach(y=>CUBE[y].m.forEach((a,i)=>{if(mstat(y,i).s!=="none"&&a[k]>max)max=a[k]}));
-    return `<div class="tscroll"><table class="yt" style="min-width:900px"><thead><tr><th class="rl">${label}</th>${MES.map((n,i)=>`<th class="${i===m?"hl":""}">${n}</th>`).join("")}<th class="tot">Total</th></tr></thead><tbody>${ys.slice().reverse().map(y=>`<tr><td class="rl">${y}</td>${CUBE[y].m.map((a,i)=>{const st=mstat(y,i);if(st.s==="none")return `<td class="none${i===m?" hl":""}">·</td>`;const v=a[k];if(v==null)return `<td class="na${i===m?" hl":""}">—</td>`;const hh=max?v/max:0;return `<td class="hm${hh>.62?" hot":""}${i===m?" hl":""}" style="--h:${hh.toFixed(3)}">${f(v)}${st.s==="partial"?'<span class="pm">*</span>':""}</td>`}).join("")}<td class="tot">${f(CUBE[y].t[k])}</td></tr>`).join("")}</tbody></table></div>`};
+    return `<div class="tscroll"><table class="yt" data-sortkey="s5hm" style="min-width:900px"><thead><tr><th class="rl">${label}</th>${MES.map((n,i)=>`<th class="${i===m?"hl":""}">${n}</th>`).join("")}<th class="tot">Total</th></tr></thead><tbody>${ys.slice().reverse().map(y=>`<tr><td class="rl">${y}</td>${CUBE[y].m.map((a,i)=>{const st=mstat(y,i);if(st.s==="none")return `<td class="none${i===m?" hl":""}">·</td>`;const v=a[k];if(v==null)return `<td class="na${i===m?" hl":""}">—</td>`;const hh=max?v/max:0;return `<td class="hm${hh>.62?" hot":""}${i===m?" hl":""}" style="--h:${hh.toFixed(3)}">${f(v)}${st.s==="partial"?'<span class="pm">*</span>':""}</td>`}).join("")}<td class="tot">${f(CUBE[y].t[k])}</td></tr>`).join("")}</tbody></table></div>`};
   h+=`<div class="panel"><div class="ptitle"><h3>Mapa de calor año × mes</h3>${segHTML("s5metric",hm.map(x=>[x[0],x[1]]),mt)}<span class="legend-heat"><i></i>intensidad sobre el máximo de toda la tabla</span></div>${hmTable(mt,hm.find(x=>x[0]===mt)[2],metricName[mt]||"")}</div>`;
   h+=`<div class="panel"><div class="ptitle"><h3>Curva mensual por año</h3>${segHTML("chartMetric",[["sales","Ventas"],["orders","Pedidos"],["aov","Ticket medio"],["units","Unidades"]],S.chartMetric)}</div><div class="chart" id="chart5"></div></div>`;
   // productos y países del mes en cada año
@@ -623,14 +630,78 @@ function s6(){
    <li>Informe de reembolsos de Shopify (fecha y líneas reembolsadas) y coste de producto para calcular margen.</li></ul></div></div>`;
 }
 
+/* ---------- ordenación por columnas ---------- */
+function cellVal(c,col){
+  if(!c)return null;
+  if(c.dataset.v!=null)return c.dataset.v===""||isNaN(+c.dataset.v)?null:+c.dataset.v;
+  const inner=c.querySelector("[data-v]");if(inner)return +inner.dataset.v;
+  const tx=c.textContent.trim();if(col===0)return tx;
+  const n=parseFloat(tx.replace(/−/g,"-").replace(/\./g,"").replace(",",".").replace(/[^\d.\-]/g,""));return isNaN(n)?null:n;
+}
+function applySorts(){
+  document.querySelectorAll("table[data-sortkey]").forEach(t=>{
+    const st=S.sorts[t.dataset.sortkey],tb=t.tBodies[0];
+    if(!tb.__orig)tb.__orig=[...tb.rows];
+    [...t.tHead.rows[0].cells].forEach((th,i)=>{th.setAttribute("aria-sort",st&&st.col===i?(st.dir>0?"ascending":"descending"):"none");th.title="Ordenar: mayor→menor, menor→mayor, original"});
+    const rows=tb.__orig.slice();
+    if(st)rows.sort((a,b)=>{const x=cellVal(a.cells[st.col],st.col),y=cellVal(b.cells[st.col],st.col);
+      if(x==null&&y==null)return 0;if(x==null)return 1;if(y==null)return -1;
+      return (typeof x==="string"?x.localeCompare(y,"es"):x-y)*st.dir});
+    rows.forEach(r=>tb.appendChild(r));
+  });
+}
+
+/* ---------- Envíos ---------- */
+function sEnv(){
+  let h=`<div class="vhead"><div><h2>Envíos</h2><p class="lead">El CSV registra la tarifa de envío que se cobró al cliente (<i>Shipping</i>) y los descuentos de envío que asumió la tienda. No incluye lo que se pagó al transportista, así que el coste real del envío y su margen no se pueden calcular con este export.</p></div></div>${filterNote()}`;
+  if(S.product!=="all") return h+`<div class="panel empty">Los envíos se cobran por pedido y no se pueden atribuir a un producto. Quita el filtro de producto para ver esta sección.</div>`;
+  const ys=selYears();
+  const rows=ys.map(y=>{const t=CUBE[y].t,c=yearComp(y);return `<tr><td class="rl">${y}</td><td style="text-align:left"><span class="badge ${yearStatus(y).full?"full":"partial"}">${yearStatus(y).txt}</span></td><td>${eur(t.shipList)}</td><td>${eur(t.sdisc)}</td><td><b>${eur(t.ship)}</b></td><td>${int(t.shipOrders)}</td><td>${int(t.noShip)}</td><td>${eur2(t.shipAvg)}</td><td>${pct(t.pShip)}</td><td>${c.why?`<span class="na" title="${esc(c.why)}">n/c</span>`:yoyHTML(c.cur.ship,c.base.ship)+` <span class="na">${esc(c.label)}</span>`}</td></tr>`}).join("");
+  h+=`<div class="panel"><div class="ptitle"><h3>Envíos por año</h3><span class="foot" style="margin:0">Pulsa una cabecera para ordenar</span></div><div class="tscroll"><table class="yt" data-sortkey="envsum" style="min-width:1080px"><thead><tr><th class="rl">Año</th><th style="text-align:left">Periodo</th><th>Tarifa de envío</th><th>Descuentos en envío</th><th>Envío cobrado</th><th>Pedidos con envío cobrado</th><th>Pedidos sin cargo de envío</th><th>Envío medio por pedido</th><th>% envío s/ ventas</th><th>Var. envío cobrado</th></tr></thead><tbody>${rows}</tbody></table></div>
+  <div class="foot">Tarifa de envío = envío antes de descuentos. Envío cobrado = tarifa − descuentos de envío = Total − Subtotal. Envío medio = envío cobrado / pedidos con envío cobrado. «Sin cargo de envío» incluye envío gratis, recogida y ventas sin dirección.</div></div>`;
+  for(const y of ys.slice().reverse()){
+    const C=CUBE[y],m=C.m;
+    const bases=[...Array(12)].map((_,i)=>monthBase(y,i));
+    const R=[
+      {label:"Tarifa de envío",sub:"antes de descuentos",vals:m.map(x=>x.shipList),total:C.t.shipList,fmt:eur,heat:true},
+      {label:"Descuentos en envío",sub:"asumidos por la tienda",vals:m.map(x=>x.sdisc),total:C.t.sdisc,fmt:eur,heat:true},
+      {label:"Envío cobrado",sub:"= Total − Subtotal",vals:m.map(x=>x.ship),total:C.t.ship,fmt:eur,heat:true,markBest:true},
+      {label:"Pedidos con envío cobrado",vals:m.map(x=>x.shipOrders),total:C.t.shipOrders,fmt:int,heat:true},
+      {label:"Pedidos sin cargo de envío",vals:m.map(x=>x.noShip),total:C.t.noShip,fmt:int,heat:true},
+      {label:"Envío medio por pedido",sub:"solo pedidos con envío",vals:m.map(x=>x.shipAvg),total:C.t.shipAvg,fmt:eur2,heat:true},
+      {label:"% envío s/ ventas netas",vals:m.map(x=>x.pShip),total:C.t.pShip,fmt:v=>pct(v),cls:"pct",sep:true},
+      {label:"Var. envío cobrado vs año ant.",vals:m.map(()=>0),fmt:String,yoy:bases.map((b,i)=>b.why?yoyHTML(0,0,b.why):yoyHTML(m[i].ship,b.base.ship)),
+        totalHTML:(()=>{const c=yearComp(y);return c.why?`<span class="na" title="${esc(c.why)}">n/c</span>`:yoyHTML(c.cur.ship,c.base.ship)})()}
+    ];
+    h+=`<div class="panel">${yearHead(y)}${yearTable(y,R)}</div>`;
+  }
+  // por país
+  const mk=S.envMetric, defs={ship:["Envío cobrado",e=>e.sh,eur],shipList:["Tarifa de envío",e=>e.sh+e.sd,eur],sdisc:["Descuentos en envío",e=>e.sd,eur],avg:["Envío medio por pedido",e=>e.so?e.sh/e.so:null,eur2]};
+  const [mlabel,fn,fmt]=defs[mk];
+  h+=`<div class="vhead"><div><h2 style="font-size:1.1rem">Envíos por país</h2><p class="lead">País de facturación. Útil para ver dónde se concentra el envío cobrado y qué destinos tienen tarifas medias más altas.</p></div>
+    <div class="controls">${segHTML("envMetric",[["ship","Envío cobrado"],["shipList","Tarifa"],["sdisc","Descuentos"],["avg","Envío medio"]],mk)}
+    <label class="flabel" for="envTop">Filas</label><select id="envTop" data-sel="envTop">${["10","20","all"].map(v=>`<option value="${v}" ${String(S.envTop)===v?"selected":""}>${v==="all"?"Todos":"Top "+v}</option>`).join("")}</select></div></div>`;
+  const cubes=new Map(ys.map(y=>[y,entityCube("c",y)]));
+  const tot=new Map();for(const C of cubes.values())for(const [k,r] of C)tot.set(k,(tot.get(k)||0)+r.t.sh);
+  const keys=[...tot].sort((a,b)=>b[1]-a[1]).slice(0,S.envTop==="all"?1e9:+S.envTop).map(x=>x[0]);
+  for(const y of ys.slice().reverse()){
+    const C=cubes.get(y);const yt=[...C.values()].reduce((a,r)=>a+(mk==="avg"?0:fn(r.t)),0);
+    const R=keys.map(k=>{const r=C.get(k);const tv=r?fn(r.t):null;return {label:cname(CTRY[k]),vals:r?r.m.map(fn):Array(12).fill(null),total:tv,fmt:v=>v?fmt(v):"·",heat:true,share:mk==="avg"?null:(yt&&tv?tv/yt:0),
+      title:(v,i)=>r?`${cname(CTRY[k])} · ${MESL[i]} ${y}: envío cobrado ${eur(r.m[i].sh)} en ${int(r.m[i].so)} pedidos`:""}});
+    h+=`<div class="panel">${yearHead(y)}${yearTable(y,R,{entity:true,rowHead:"País",share:mk!=="avg",sortKey:"env"})}<div class="foot">${mlabel}. ${mk==="avg"?"Total anual = envío cobrado del año / pedidos con envío.":"% s/ total = peso del país en el "+mlabel.toLowerCase()+" del año."}</div></div>`;
+  }
+  return h;
+}
+
 /* ---------- navegación ---------- */
-const TABS=[["s1","1 · Evolución"],["s2","2 · Productos"],["s3","3 · Finanzas"],["s4","4 · Países"],["s5","5 · Estacionalidad"],["s6","Calidad y metodología"]];
-const VIEWS={s1,s2,s3,s4,s5,s6};
+const TABS=[["s1","1 · Evolución"],["s2","2 · Productos"],["s3","3 · Finanzas"],["env","Envíos"],["s4","4 · Países"],["s5","5 · Estacionalidad"],["s6","Calidad y metodología"]];
+const VIEWS={s1,s2,s3,s4,s5,s6,env:sEnv};
 function render(){
   buildCube();
   $("#tabs").innerHTML=TABS.map(([k,l])=>`<button role="tab" type="button" data-tab="${k}" aria-selected="${S.tab===k}">${l}</button>`).join("");
   $("#main").innerHTML=`<section class="view" id="${S.tab}">${VIEWS[S.tab]()}</section>`;
   lineChart($("#chart1"),S.chartMetric);lineChart($("#chart5"),S.chartMetric);
+  applySorts();
 }
 function initFilters(){
   $("#coverage").textContent=`${int(Q.orders_paid)} pedidos pagados · ${FIRST.split("-").reverse().join("/")} – ${LAST.split("-").reverse().join("/")} · EUR`;
@@ -646,6 +717,11 @@ function initFilters(){
 document.addEventListener("click",e=>{
   const t=e.target.closest("[data-tab]");if(t){S.tab=t.dataset.tab;try{localStorage.setItem("shopdash-tab",S.tab)}catch(_){}history.replaceState(null,"","#"+S.tab);render();window.scrollTo({top:0});return}
   const y=e.target.closest("[data-year]");if(y){const v=+y.dataset.year;if(S.years.has(v)&&S.years.size>1)S.years.delete(v);else S.years.add(v);y.setAttribute("aria-pressed",S.years.has(v));render();return}
+  const th=e.target.closest("table[data-sortkey] thead th");if(th){
+    const k=th.closest("table").dataset.sortkey,col=th.cellIndex,cur=S.sorts[k];
+    const first=col===0?1:-1;
+    if(!cur||cur.col!==col)S.sorts[k]={col,dir:first};else if(cur.dir===first)cur.dir=-first;else delete S.sorts[k];
+    applySorts();return}
   const b=e.target.closest("[data-seg] button");if(b){const k=b.parentElement.dataset.seg;S[k]=b.dataset.v;render()}
 });
 document.addEventListener("change",e=>{
