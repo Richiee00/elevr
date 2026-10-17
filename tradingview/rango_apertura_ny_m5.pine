@@ -6,12 +6,11 @@
 // 1) Rango: máximo más alto y mínimo más bajo (con mechas) de las 3 velas M5
 //    de 9:30, 9:35 y 9:40 hora NY.
 // 2) Desde las 9:45 se vigila cada vela M5 que TOQUE el máximo o el mínimo:
-//    A. Rompe máximo + CIERRE ≥20 pts por debajo del máximo → SHORT de reversión
-//    B. Rompe máximo + CIERRE ≥20 pts por encima del máximo → LONG de continuación
-//    C. Rompe mínimo + CIERRE ≥20 pts por debajo del mínimo → SHORT de continuación
-//    D. Rompe mínimo + CIERRE ≥20 pts por encima del mínimo → LONG de reversión
-//    E. CIERRE pegado al nivel (<20 pts)                    → no se opera
-//    En el gráfico solo se dibujan las operaciones ejecutadas.
+//    A. Rompe máximo + cierra ≥20 pts DENTRO  → SHORT de reversión
+//    B. Rompe máximo + cierra ≥20 pts FUERA   → LONG de continuación
+//    C. Rompe mínimo + cierra ≥20 pts FUERA   → SHORT de continuación
+//    D. Rompe mínimo + cierra ≥20 pts DENTRO  → LONG de reversión
+//    E. Cierra pegada al nivel (<20 pts)      → no se opera
 // 3) Filtro: cuerpo ≥ 35% del rango total de la vela.
 // 4) SL en el extremo de la vela de señal (o en el cuerpo, opcional):
 //    mínimo 40 pts, máximo 120 pts. TP fijo a 1:2.
@@ -52,6 +51,8 @@ rr        = input.float(2.0, "Ratio TP (R:R 1:x)", minval = 0.1, step = 0.1, gro
 grpV = "Visual"
 showRange    = input.bool(true, "Mostrar caja del rango 9:30-9:45", group = grpV)
 showBands    = input.bool(true, "Mostrar bandas de ±20 pts", group = grpV)
+showE        = input.bool(false, "Etiquetar casos E (pegada al nivel)", group = grpV)
+showRejected = input.bool(true, "Etiquetar señales descartadas por filtro", group = grpV)
 showTable    = input.bool(true, "Mostrar tabla de conteo", group = grpV)
 
 // ── Rango 9:30–9:45 ─────────────────────────────────────────────────────────
@@ -90,7 +91,6 @@ bodyOK    = candleRng > 0 and math.abs(close - open) >= bodyPct / 100 * candleRn
 touchH = rangeReady and high >= rH
 touchL = rangeReady and low <= rL
 
-// La distancia de 20 pts se mide SIEMPRE desde el CIERRE de la vela al nivel (no la mecha)
 caseA = touchH and close <= rH - breakPts
 caseB = touchH and close >= rH + breakPts
 caseC = touchL and close <= rL - breakPts
@@ -136,6 +136,10 @@ if canTrade and (longSig or shortSig)
          longSig and na(longDist) ? "SL > " + str.tostring(slMax) : shortSig and na(shortDist) ? "SL > " + str.tostring(slMax) : ""
     if reason != ""
         nFilt += 1
+        if showRejected
+            label.new(bar_index, longSig ? low : high, caseName + "\nDescartada: " + reason,
+                 style = longSig ? label.style_label_up : label.style_label_down,
+                 color = color.new(color.gray, 20), textcolor = color.white, size = size.small)
     else if longSig
         float sl = close - longDist
         float tp = close + rr * longDist
@@ -156,6 +160,9 @@ if canTrade and (longSig or shortSig)
              style = label.style_label_down, color = color.new(color.red, 0), textcolor = color.white, size = size.small)
         line.new(bar_index, sl, bar_index + 12, sl, color = color.red, width = 2)
         line.new(bar_index, tp, bar_index + 12, tp, color = color.green, width = 2)
+else if canTrade and caseE and showE
+    label.new(bar_index, touchH ? high : low, "E", style = touchH ? label.style_label_down : label.style_label_up,
+         color = color.new(color.gray, 50), textcolor = color.white, size = size.tiny)
 
 // Cierre al final de la sesión
 nyMinutes = hour(time, TZ) * 60 + minute(time, TZ)
