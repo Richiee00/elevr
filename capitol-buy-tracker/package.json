@@ -1,0 +1,42 @@
+{
+  "name": "capitol-buy-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dashboard of stock purchases disclosed by US politicians, compared with current market prices.",
+  "scripts": {
+    "dev": "next dev",
+    "dev:mock": "DATA_MODE=mock next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "update:trades": "tsx scripts/update-trades.ts",
+    "update:prices": "tsx scripts/update-prices.ts"
+  },
+  "dependencies": {
+    "cheerio": "1.0.0",
+    "next": "15.5.28",
+    "pg": "8.16.3",
+    "react": "19.1.10",
+    "react-dom": "19.1.10",
+    "recharts": "2.15.4"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "@types/pg": "8.15.5",
+    "@types/react": "19.1.17",
+    "@types/react-dom": "19.1.11",
+    "autoprefixer": "10.4.21",
+    "dotenv": "16.6.1",
+    "postcss": "8.5.6",
+    "tailwindcss": "3.4.19",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
